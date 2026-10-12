@@ -5,6 +5,7 @@ ctlkit is the Go module every `*ctl` tool is built on. It holds the command tabl
 ## Rules
 
 - [CONVENTIONS.md](CONVENTIONS.md) is the contract. A change to behaviour changes that file and `ctltest.Contract` in the same commit.
+- [DISCOVERY.md](DISCOVERY.md) is where everything learned about finding out how a service works is kept. When work on any tool turns up a tip, a trap or a recipe that would have helped on an earlier one, add it there in the same session. Do not leave it in a chat or in one tool's notes.
 - Every tool depends on this module. Keep exported names stable. A rename or a changed output is a breaking change for all of them.
 - Nothing about one service goes in here. If only one tool needs it, it belongs in that tool.
 - Dependencies are `go-keyring` and `x/term`. Add another only when it removes real code.
@@ -18,7 +19,7 @@ ctlkit is the Go module every `*ctl` tool is built on. It holds the command tabl
 - `errors.go` holds the error kinds and their exit codes. The `kinds` table is the one list, read by help and schema.
 - `help.go`, `schema.go` and `skill.go` hold the built-in commands.
 - `validate.go` holds the input checks.
-- `httpx/` holds the HTTP plumbing, `keystore/` the keyring, `ctltest/` the contract test.
+- `httpx/` holds the HTTP plumbing, `keystore/` the keyring, `session/` the login that renews itself, `ctltest/` the contract test.
 - `ctlkit_test.go` builds a small tool, `petctl`, and runs the contract and the behaviour tests against it.
 
 ## Commands

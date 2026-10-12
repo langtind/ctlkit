@@ -4,7 +4,7 @@ The command line that every `*ctl` tool is built on.
 
 A tool fills in a table of commands. ctlkit parses the flags from the table, prints help from it, and publishes it with the `schema` command, so the three cannot drift apart. It also supplies error kinds with their exit codes, JSON output, field selection, confirmation, input checks and the skill installer.
 
-The tools are written for AI agents first. [CONVENTIONS.md](CONVENTIONS.md) describes the contract they share.
+The tools are written for AI agents first. [CONVENTIONS.md](CONVENTIONS.md) describes the contract they share. [DISCOVERY.md](DISCOVERY.md) describes how to find out how a service works before its client is written: where to look, what to find out about login and tokens, and what earlier tools got wrong.
 
 To start a new tool, use [ctl-template](https://github.com/langtind/ctl-template).
 
@@ -38,6 +38,7 @@ That gives `petctl pets`, `petctl pets --json --fields id,name`, `petctl pets --
 | `ctlkit` | `Program`, the command table, `Call`, error kinds, `CheckID` |
 | `ctlkit/httpx` | `Do`, which turns an HTTP status into an error kind and never retries |
 | `ctlkit/keystore` | One secret in the system keyring, and `Memory` for tests |
+| `ctlkit/session` | A login that renews itself: access token, refresh token, and renewal under a lock |
 | `ctlkit/ctltest` | `Contract`, which holds a tool to the conventions, and `Run` for a tool's own tests |
 
 ## What a tool gets
