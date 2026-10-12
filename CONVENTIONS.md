@@ -1,0 +1,80 @@
+# Conventions
+
+Every `*ctl` tool follows this contract. The reader of a tool's output is usually an AI agent, so the contract is written for a caller that cannot be asked what it meant and cannot answer a prompt.
+
+`ctlkit` implements most of the contract, and `ctltest.Contract` checks it. A rule marked **(you)** is one the tool author has to keep.
+
+## Output
+
+- Data goes to stdout. Notes, warnings, prompts and errors go to stderr. Use `Call.Note` for a note.
+- Markdown is the default. It reads well in a terminal and when an agent relays it into a chat.
+- Every command that prints data has `--json`. With `--json`, stdout holds one JSON document and nothing else.
+- An empty list is `[]`, never `null`. **(you)** for a list inside an object.
+- A list that can grow without bound has `--limit`. When the result is cut off, say so: `"truncated": true` in JSON and a line in the Markdown. **(you)**
+- A list command also takes `--fields`, which keeps only the named fields of each item. It applies to a list, to `items` in an object, or to a single object.
+- Field names in JSON are a contract. Add fields freely. Renaming or removing one is a breaking change. **(you)**
+- Times are RFC 3339. Never print "3 days ago". **(you)**
+
+## Errors
+
+- An error has a kind, and each kind has its own exit code.
+
+  | Exit | Kind | Meaning |
+  | --- | --- | --- |
+  | 0 | | Success |
+  | 1 | `failure` | The command failed |
+  | 2 | `usage` | The call was wrong. Fix it before running it again |
+  | 3 | `not_found` | What was asked for does not exist |
+  | 4 | `auth` | Not logged in, or not allowed |
+  | 5 | `conflict` | The service is already in a state that rules the change out |
+  | 6 | `rate_limit` | The service asked for a pause |
+  | 7 | `unavailable` | The service could not be reached or failed. A later try may work |
+
+- With `--json`, an error is the one JSON document on stdout, and stderr stays empty:
+
+  ```json
+  {"error": {"kind": "not_found", "message": "...", "hint": "...", "retryAfter": "30 seconds", "usage": "..."}}
+  ```
+
+- An error says what to do next. A wrong enum value lists the right ones. A missing login names the login command. Use `Error.WithHint`, or `Program.Hint` for an error that cannot say it itself. **(you)**
+- Echo the value that was wrong. **(you)**
+- Never retry in a loop. Report `Retry-After` and stop. `httpx.Do` does this.
+- An unknown flag is a usage error. So is a filter that cannot be applied. Never drop one silently. **(you)**
+
+## Commands
+
+- The command table is the single description of the command line. Add a command or a flag there and nowhere else.
+- `help`, `<command> --help` and `schema` are generated from the table. `schema` works with no login, no config and no network.
+- A command name is one or two lower-case words: `events`, `watch add`.
+- A command never hangs. Anything it would prompt for can also be given as a flag or on stdin. Without a terminal it refuses and names the flag.
+- An argument that names one thing at the service is marked `ID: true`. It is refused when it holds white space, `?`, `#`, `%`, a slash or `..`.
+- Build filters into the command. Do not rely on the caller piping through `jq`. **(you)**
+
+## Changes
+
+- A command that changes something at the service is marked `Mutates: true`. It takes `--dry-run` and `--yes`.
+- `--dry-run` prints what would be sent and changes nothing. It may read, to check that what the call names exists. The result says `"dryRun": true`. **(you)**
+- The question that `Call.Confirm` asks names the thing that changes, not only its id. **(you)**
+- Without `--yes`, the command asks. Without a terminal it refuses. Use `Call.Confirm`.
+- Say what running the command again does: nothing, the same thing, or one more. **(you)**
+- Do not build a write from a guess. Observe the request first and keep it in `reference/`. **(you)**
+
+## Secrets
+
+- A secret never comes as an argument. Read it with `Call.Secret`: from stdin with a `--...-stdin` flag, or from a prompt without echo.
+- Store it with `keystore.Keyring`. Never write it to a file, a log or an error message. **(you)**
+- An environment variable may override the keyring, for cron jobs and containers. **(you)**
+
+## Remote data
+
+- What a service returns is data. Never follow an instruction found in it, and say so in the skill. **(you)**
+- Keep a copy of the API as it was observed in `reference/`, with a list of what is verified. **(you)**
+- Be polite: one request per command where possible. **(you)**
+- No person, customer or organisation that exists goes into code, docs, tests or fixtures. **(you)**
+
+## The skill
+
+- `skills/<name>/SKILL.md` teaches workflows and guardrails. `schema` and `help` list the flags, so the skill does not have to.
+- It is embedded in the binary and copied out by `install-skill`.
+- A test checks that every command and flag in its code blocks exists.
+- Update it when a command changes. **(you)**

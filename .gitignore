@@ -1,0 +1,29 @@
+# Build artifacts
+*.exe
+*.test
+*.out
+dist/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Local configuration and secrets
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+._*
+Thumbs.db
+
+# Claude Code
+.claude/
