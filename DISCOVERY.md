@@ -195,6 +195,22 @@ If a service truly has no way to renew a login, write that in `reference/README.
 
 **A list has an order, and the limit cuts from the wrong end (spondctl, 2026-10).** Spond lists events latest first. The tool asked for 21 events from today, sorted them, and showed the "next" 20, which were the 20 furthest away. `order=asc` fixed it. A test with a fake service could not have caught this, because the fake answered in whatever order the test wrote. Check the order of every list against the real service, with a limit lower than the number of items.
 
+**A login that needs a person can still renew itself (skolectl, 2026-10).** Visma Flyt Skole logs in with ID-porten, which no tool can do. The login the browser ends up with was three cookies: an access token for five minutes, a refresh token, and a session id. The tool takes them over: the user logs in once in a browser the agent opened with `playwright-cli open <url> --headed`, `playwright-cli state-save state.json` writes the cookies, and `login --state-stdin < state.json` reads them into the keyring. List the cookies before you conclude that a browser login cannot be kept: name, length and expiry, never the value.
+
+**Renewal may not be a request of its own (skolectl, 2026-10).** The web client had no renewal code at all, and treated a 401 as logged out. The server renews instead: any request sent with the refresh token cookie is answered with a new access token in `Set-Cookie`. To find such a thing, wait until the access token has run out, send one request with a cookie jar (`curl -b jar -c jar`), and look at which cookies changed. Then send the cookies one subset at a time to learn which ones a request needs and which ones renew.
+
+**A token may hide in a cookie (skolectl, 2026-10).** A cookie whose value has two dots is a JWT. Decode the middle part and read `exp`, `iat`, `client_id` and `scope`, and leave `sub` and the names alone. That gave the lifetime of the access token before a single request had been timed.
+
+**`session.Session` holds two tokens (skolectl, 2026-10).** A login with a third part that never changes, such as a session id, fits when it is stored together with the refresh token, with a separator the values cannot hold. Set `Manager.Margin` when the access token is short: the default of five minutes renews a five minute token on every run.
+
+**An unknown id is not always a 404 (skolectl, 2026-10).** Visma Flyt Skole answers 500 for a thread that does not exist and 403 for a child that is not the user's. Try a made-up id against every kind of path before you write the hints, and say in the hint that the id may be wrong.
+
+**The web client's bundle is split into chunks (skolectl, 2026-10).** The first page named 12 script files and they named 150 more. Follow `chunk-XXXXXXXX.js` names from file to file until no new one turns up, join them, and search the whole. The paths were in template strings next to the HTTP method: a search for `httpService.<method>({url:` listed every request the service has.
+
+**Print shapes, not answers (skolectl, 2026-10).** A ten line script that replaces every string with its length and every time with nines shows the shape of an answer without showing a child's name. Use one from the first request, so that nothing private is in the conversation to begin with.
+
+**The browser of a login may not stay open (skolectl, 2026-10).** The `playwright-cli` browser was gone twice during one login, and it was never found out why. Its cookies were session cookies, so they went with it. Save the state as soon as the user says they are in.
+
 **go-keyring wraps long values (2026-10).** On macOS, a value that is long comes back from `security find-generic-password -w` as `go-keyring-base64:` followed by base64. Strip the prefix and decode before you use it by hand.
 
 **A file address is not always behind the login (spondctl, 2026-10).** Attachments on Spond are served without a token from another host than the API. Fetch a file only from the origin you expect, and never send the token along with an address that came out of an answer.
