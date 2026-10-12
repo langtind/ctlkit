@@ -14,7 +14,7 @@ Stop at the first source that answers the question. Each step down costs more se
 | 2. An open client somebody else wrote | Paths, parameters, field names | None. Take facts only, and check its licence before you copy a line |
 | 3. The service's own web client | What the service's own code does: login, renewal, headers, retries | None. No proxy and no certificate |
 | 4. Live answers from the tool itself | Shapes, lifetimes, ordering, limits | One login |
-| 5. A proxy in front of the mobile app | A service that has no web client | A certificate on the phone, and it fails when the app pins its certificate |
+| 5. Sniff the traffic, on your own or with the user's help | A service that has no web client | A proxy, a certificate on the phone, and it fails when the app pins its certificate |
 
 An open client is a lead, not a fact. It shows what worked for its author when it was written. It is often wrong about what is missing: see the first lesson below.
 
@@ -63,14 +63,45 @@ tmplctl thing <id> --raw | jq '{attachments, responseKeys: (.responses | keys)}'
 
 Look at keys and types. Do not print a whole answer into the conversation or into a file in the repo: it holds real people.
 
-### 5. A proxy
+### 5. Sniff the traffic
 
-Only when the service has no web client, or the app does something the web client does not.
+When the steps above do not answer the question: the service has no web client, the app does something the web client does not, or the bundle is too obscured to read.
 
-- **mitmproxy** (`brew install mitmproxy`) is the one that suits an agent: `mitmdump` runs without a window, writes flows to a file, and takes a Python addon that can strip values so only shapes are written. `mitmproxy2swagger` turns a flow file or a HAR into a draft OpenAPI file. Not used in any tool here yet.
-- **Proxyman** has an MCP server with its own redaction, and makes the certificate setup on an iPhone easy. The app has to be open, bodies come as previews, and it exports cURL but not HAR. Good when a person is driving.
+**Try on your own first.** Much can be captured without anyone's help:
 
-A capture holds a login token and other people's data. Extract the request and the field names, write them in `reference/`, and delete the capture. Never commit one. `.gitignore` in the template already refuses `*.har` and `*.proxymansession`.
+- The web client in a browser you drive yourself, with `playwright-cli requests` as shown above. The user logs in once, and the rest is yours.
+- A desktop app or a command line tool, by starting it behind a proxy: `HTTPS_PROXY=http://127.0.0.1:8080 <command>`, with the proxy's certificate trusted.
+- An iOS simulator or an Android emulator on this machine, when the app can be installed there.
+
+**Then ask the user for help.** A phone app with a real account needs a person: someone has to hold the phone and tap. Do not give up, and do not guess the request instead. Ask, and make the ask small and exact:
+
+1. Say what you need to see and why: "I need the request the app sends when you accept an invitation."
+2. Say what to set up, or set up the part you can. The user has Proxyman.
+3. Ask them to do the one thing in the app: log in, open a list, accept and then undo. Name the taps.
+4. Ask them to say when it is done, then read what was captured.
+
+A capture of a login is the most useful one there is. It shows every token, and a second start of the app a day later shows the renewal.
+
+**Tools**
+
+| Tool | Use it when | Notes |
+| --- | --- | --- |
+| Proxyman | A person captures from an iPhone or an Android phone | The user has it. It walks through the certificate on the phone, and it has an MCP server (`/Applications/Proxyman.app/Contents/MacOS/mcp-server`) and `proxyman-cli`, so the agent can read the flows the user captured. Keep its redaction on. The app has to be open, and bodies come as previews |
+| mitmproxy | The agent captures on its own, with no window | `brew install mitmproxy`. `mitmdump -w flows` writes to a file, and a Python addon can strip values so that only shapes are written. `mitmproxy2swagger` turns a flow file or a HAR into a draft OpenAPI file. Not used in any tool here yet |
+| `playwright-cli` | The service has a web client | No proxy and no certificate |
+
+**Capturing from a phone, in short**
+
+1. The phone and the Mac are on the same network. The proxy runs on the Mac.
+2. On the phone, set the Wi-Fi proxy to the Mac's address and the proxy's port.
+3. Install the proxy's certificate on the phone and trust it. On iOS that is two places: install the profile, then turn it on under Settings, General, About, Certificate Trust Settings. On Android 7 and later an app trusts a user certificate only if it was built to, so many apps show nothing.
+4. Turn on SSL proxying for the service's hosts only.
+5. Do the thing in the app.
+6. Turn the phone's proxy off again. Say so to the user, or their phone has no network once the Mac sleeps.
+
+When the app shows a network error as soon as the proxy is on, it pins its certificate. Then the proxy will not work without changing the app. Go back to the web client, or to an older or a different client of the same service.
+
+**Afterwards.** A capture holds a login token and other people's data. Extract the request and the field names, write them in `reference/`, and delete the capture. Never commit one. `.gitignore` in the template already refuses `*.har` and `*.proxymansession`.
 
 ## What to find out
 
@@ -144,14 +175,19 @@ curl -s -H "Authorization: Bearer $T" "https://api.example.com/things?max=4" | j
 
 ## Stay logged in
 
-An agent cannot answer a login prompt, so a tool has to keep itself logged in for as long as the service allows.
+An agent cannot answer a login prompt, so a tool has to keep itself logged in for as long as the service allows. Aim for this in every tool: the user logs in once, and after that the tool renews the login itself.
 
-- Store the whole login with `session.Manager`: the access token, the refresh token, and when each runs out.
-- `Manager.Token` renews when the access token is about to run out. `Manager.Refresh` renews after the service refused a token, and the client then sends the request once more.
-- Renewal runs under a lock file. An agent runs several commands at the same time, and a service that rotates refresh tokens would log out every run but one.
-- Only a clear no from the service ends the login. A timeout or a 503 during renewal says nothing about it, and the stored login is left alone.
-- Give the tool `status`, which says how long the login lasts without calling the service, and `refresh`, which renews now. The template has both.
-- When the refresh token itself runs out, the user logs in again. Say so in the error, and say in `status` when that will be.
+- **Find the refresh token.** Nearly every service that logs in with a password has one. Look for it in the login answer before you settle for an access token that runs out. If the answer has none, look at what the service's own client does when its token runs out: it does something, and that is the renewal.
+- **Find the renewal request.** The web client's code says it outright. Failing that, a capture of the app being opened a day after login shows it.
+- **Store the whole login in the system keyring, and nowhere else.** `session.Manager` over `keystore.Keyring` keeps the access token, the refresh token, and when each runs out, in the macOS Keychain or its counterpart. Never in a file, an environment file, a log or an error message.
+- **Never store the password.** The refresh token is what keeps the tool logged in. A password manager with a fingerprint prompt is fine for the first login, and wrong for every day: an agent cannot press the sensor.
+- **Renew at the right times.** `Manager.Token` renews when the access token is about to run out. `Manager.Refresh` renews after the service refused a token, and the client then sends the request once more.
+- **Renew under the lock.** An agent runs several commands at the same time, and a service that rotates refresh tokens would log out every run but one. `session.Manager` does this when it has a `LockPath`.
+- **Only a clear no ends the login.** A timeout or a 503 during renewal says nothing about it, and the stored login is left alone.
+- **Give the tool `status` and `refresh`.** `status` says how long the login lasts without calling the service. `refresh` renews now. The template has both.
+- **Say when the user is needed.** When the refresh token itself runs out, the user logs in again. Say so in the error, and say in `status` when that will be.
+
+If a service truly has no way to renew a login, write that in `reference/README.md` with what you checked, so that the next person does not look again.
 
 ## Lessons
 

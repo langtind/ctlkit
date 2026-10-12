@@ -68,7 +68,8 @@ Every `*ctl` tool follows this contract. The reader of a tool's output is usuall
 ## Login
 
 - A tool stays logged in for as long as the service allows. The caller is an agent, and an agent cannot answer a login prompt.
-- Store the login with `session.Manager`, with the refresh token and both expiry times. It renews before the access token runs out and after the service refused one, under a lock so that runs at the same time do not log each other out.
+- Aim for a refresh token in every tool. The user logs in once, and after that the tool renews the login itself. The password is never stored.
+- Store the login in the system keyring with `session.Manager`, with the refresh token and both expiry times. It renews before the access token runs out and after the service refused one, under a lock so that runs at the same time do not log each other out.
 - Only a clear no from the service ends the login. A failed renewal that is not a refusal leaves it alone.
 - `status` says whether a login is stored and how long it lasts, without calling the service. `refresh` renews it now.
 - Find out how the service's tokens work before writing any of this. [DISCOVERY.md](DISCOVERY.md) says how. **(you)**
