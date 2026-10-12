@@ -100,15 +100,6 @@ func (c *Command) shortUsage() string {
 	return strings.Join(parts, " ")
 }
 
-func (c *Command) flag(name string) *Flag {
-	for i := range c.Flags {
-		if c.Flags[i].Name == name {
-			return &c.Flags[i]
-		}
-	}
-	return nil
-}
-
 func (a Arg) usage() string {
 	name := a.Name
 	if a.Variadic {

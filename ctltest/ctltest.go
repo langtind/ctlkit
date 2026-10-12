@@ -129,7 +129,7 @@ func Contract(t *testing.T, build func() *ctlkit.Program, docs ...string) {
 			has := func(name string) bool {
 				return slices.ContainsFunc(cmd.Flags, func(f ctlkit.Flag) bool { return f.Name == name && f.Kind == ctlkit.Bool })
 			}
-			if cmd.Mutates && !(has("dry-run") && has("yes")) {
+			if cmd.Mutates && (!has("dry-run") || !has("yes")) {
 				t.Errorf("%s changes something at the service, so it needs ctlkit.DryRunFlag and ctlkit.YesFlag", cmd.Name)
 			}
 			if !cmd.Mutates && has("dry-run") {
