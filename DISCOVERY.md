@@ -262,3 +262,15 @@ If a service truly has no way to renew a login, write that in `reference/README.
 **`go install` of a module that needs a private module fails for everyone else.** A public tool needs a public ctlkit. CI fails the same way, with `could not read Username for 'https://github.com'`.
 
 **A local Homebrew tap is a copy.** After a release, `brew install` does not find a new cask until `brew update` has run.
+
+**Ask a GraphQL service for its own schema first (checkinctl, 2026-10).** Checkin's `/graphql` answered an introspection query without a login: `{ __schema { queryType { fields { name } } mutationType { fields { name } } } }`. That gave every query, every mutation and every input type in one request, before any page had been read. Save the full schema to a scratch file and search it, also for arguments named `hash`, `token` or `key`, which show what a link or a code gives access to.
+
+**A service may describe itself for agents (checkinctl, 2026-10).** Checkin has no public API docs, and a web search found none. Its own `llms.txt` said outright that there is an official API for organisers, that the docs are given on request, and that there is an MCP server. Fetch `/llms.txt` on the service's sites as part of step 1, and say in `reference/` who the official API is for.
+
+**The login may be a link (checkinctl, 2026-10).** A participant at Checkin has no account. The link in the confirmation email holds a ticket number and a short code, and the code is all the service asks for. Such a link is a secret: read it with `Call.Secret` from stdin or a prompt, keep it in the keyring under a name the user gives it, and never print it. There is no token and nothing to renew, so the tool has no `refresh` and does not use `session.Manager`.
+
+**A wrong link may be a redirect, not an error (checkinctl, 2026-10).** A wrong code and an unknown ticket both answered `302` to the front page, which a client that follows redirects reads as a page that loaded. Turn redirects off for such a request, with `CheckRedirect` returning `http.ErrUseLastResponse` on a copy of the client, and say in the hint that the two cases cannot be told apart.
+
+**A refused write may be a 200 (checkinctl, 2026-10).** Checkin answers a change it will not make with HTTP 200 and a warning, `full`, next to the unchanged ticket. Try a write that must fail, with the user's yes, before you build on what the web client seems to do: the test showed that the ticket keeps what it had, which the page's script only hinted at.
+
+**ctltest cannot tell a GraphQL read from a change (checkinctl, 2026-10).** `ctltest.ChangeNeedsAYes` and `Fake.Changes` take every request that is not a GET for a change, and a GraphQL read is a POST to the same path as a mutation. Until ctlkit has a way to tell them apart by the body, the tool writes that check itself. `ctlkit.Write` also does not fit a change that is tried again each time a place opens, when a refused try is known to change nothing.
