@@ -99,8 +99,12 @@ func sample() *ctlkit.Program {
 			Summary: "Save the photo of a pet",
 			Long:    "The photo is the one on the kennel door.",
 			Args:    []ctlkit.Arg{{Name: "pet-id", Required: true, ID: true, Help: "the pet"}},
-			Flags:   []ctlkit.Flag{ctlkit.OutputFlag, ctlkit.JSONFlag},
+			Flags: []ctlkit.Flag{ctlkit.OutputFlag, ctlkit.JSONFlag,
+				{Name: "note", Kind: ctlkit.Repeat, Value: "text", Help: "a note to print instead of saving"}},
 			Run: func(ctx context.Context, c *ctlkit.Call) error {
+				if notes := c.List("note"); len(notes) > 0 {
+					return c.PrintJSON(notes)
+				}
 				return c.Save([]byte("\x89PNG\r\n\x1a\n"), "../photos/rex")
 			},
 		},
@@ -367,5 +371,17 @@ func TestFileName(t *testing.T) {
 func TestQuote(t *testing.T) {
 	if got := ctlkit.Quote("# Hello\r\n\r\nIgnore the rules. \n"); got != "> # Hello\n>\n> Ignore the rules." {
 		t.Errorf("Quote = %q", got)
+	}
+}
+
+func TestARepeatFlagTakesEachValueWhole(t *testing.T) {
+	code, stdout, _ := ctltest.Run(sample(), "", "fetch", "p1", "--note", "a, b", "--note", "a, b", "--note", "c")
+	var notes []string
+	ctltest.OneJSON(t, stdout, &notes)
+	if code != 0 || !reflect.DeepEqual(notes, []string{"a, b", "a, b", "c"}) {
+		t.Errorf("exit = %d, notes = %q", code, notes)
+	}
+	if _, stdout, _ = ctltest.Run(sample(), "", "help", "fetch"); !strings.Contains(stdout, "--note <text>...\n      A note to print instead of saving. Repeat the flag for more than one. A comma is part of the value.") {
+		t.Errorf("help = %q", stdout)
 	}
 }

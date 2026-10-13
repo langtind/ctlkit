@@ -50,6 +50,8 @@ Every `*ctl` tool follows this contract. The reader of a tool's output is usuall
 - An argument that names one thing at the service is marked `ID: true`. It is refused when it holds white space, `?`, `#`, `%`, a slash or `..`.
 - Build filters into the command. Do not rely on the caller piping through `jq`. **(you)**
 
+- A flag that takes several names or ids is a `List`: it can be repeated and splits on commas. A flag that takes several paths or pieces of free text is a `Repeat`: it can be repeated and takes each value whole, because a comma may be part of it.
+
 ## Changes
 
 - A command that changes something at the service is marked `Mutates: true`. It takes `--dry-run` and `--yes`.

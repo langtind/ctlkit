@@ -45,7 +45,8 @@ type schemaArg struct {
 
 type schemaFlag struct {
 	Name string `json:"name"`
-	// Type is bool, string, int or list. A list flag can be repeated and
+	// Type is bool, string, int, list or repeat. A repeat flag can be
+	// repeated and takes each value whole. A list flag can be repeated and
 	// takes comma-separated values.
 	Type string `json:"type"`
 	// Default is null when the flag has none.

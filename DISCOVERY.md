@@ -239,7 +239,7 @@ If a service truly has no way to renew a login, write that in `reference/README.
 
 **A login page may be another door to the same service (skolectl, 2026-10).** A new address turned out to be the school's login page for staff, with a link to the portal the tool already used. Follow the link before you conclude that the service has moved.
 
-**A list flag splits on commas (2026-10).** `Call.List` takes `a,b` as two values and drops repeats, so a file path with a comma in it cannot be given to a flag such as `--attach`. Say so in the flag's help.
+**A list flag splits on commas (2026-10).** A `List` flag takes `a,b` as two values and drops repeats, so a file path with a comma in it could not be given to `--attach`. From ctlkit v0.4.0 a flag for paths or free text is a `Repeat`, which takes each value whole.
 
 **go-keyring wraps long values (2026-10).** On macOS, a value that is long comes back from `security find-generic-password -w` as `go-keyring-base64:` followed by base64. Strip the prefix and decode before you use it by hand.
 

@@ -24,6 +24,10 @@ const (
 	// List is a string flag that can be repeated and also takes a
 	// comma-separated list.
 	List FlagKind = "list"
+	// Repeat is a string flag that can be repeated, and whose value is
+	// taken whole. Use it for a path or free text, where a comma is part
+	// of the value.
+	Repeat FlagKind = "repeat"
 )
 
 type Flag struct {
@@ -123,6 +127,8 @@ func (f Flag) usage() string {
 		return "--" + f.Name
 	case f.Kind == List:
 		return "--" + f.Name + " <" + f.Value + ",...>"
+	case f.Kind == Repeat:
+		return "--" + f.Name + " <" + f.Value + ">..."
 	case f.Value == "":
 		return "--" + f.Name + " " + strings.Join(f.Enum, "|")
 	}
@@ -141,6 +147,9 @@ func (f Flag) description() string {
 	text := sentence(f.Help)
 	if f.Kind == List {
 		text += " Repeat the flag or separate values with commas."
+	}
+	if f.Kind == Repeat {
+		text += " Repeat the flag for more than one. A comma is part of the value."
 	}
 	if len(f.Enum) > 0 && f.Value != "" {
 		text += " One of: " + strings.Join(f.Enum, ", ") + "."
@@ -161,7 +170,14 @@ type Input struct {
 func (in *Input) Bool(name string) bool     { return *in.value(name).(*bool) }
 func (in *Input) String(name string) string { return *in.value(name).(*string) }
 func (in *Input) Int(name string) int       { return int(*in.value(name).(*int64)) }
-func (in *Input) List(name string) []string { return *in.value(name).(*listValue) }
+
+// List returns the values of a List or a Repeat flag.
+func (in *Input) List(name string) []string {
+	if whole, ok := in.value(name).(*repeatValue); ok {
+		return *whole
+	}
+	return *in.value(name).(*listValue)
+}
 
 // Given reports whether the flag was on the command line, which a default
 // value cannot tell.
@@ -205,6 +221,19 @@ func (l *listValue) Set(value string) error {
 	return nil
 }
 
+// repeatValue collects a repeatable flag whose values are taken whole.
+type repeatValue []string
+
+func (r *repeatValue) String() string { return strings.Join(*r, "\n") }
+
+func (r *repeatValue) Set(value string) error {
+	if value == "" {
+		return errors.New("empty value")
+	}
+	*r = append(*r, value)
+	return nil
+}
+
 var errHelp = errors.New("help requested")
 
 // parse reads flags placed on either side of the positional arguments and
@@ -231,6 +260,10 @@ func (c *Command) parse(args []string) (*Input, error) {
 			list := new(listValue)
 			fs.Var(list, f.Name, f.Help)
 			in.flags[f.Name] = list
+		case Repeat:
+			whole := new(repeatValue)
+			fs.Var(whole, f.Name, f.Help)
+			in.flags[f.Name] = whole
 		}
 	}
 
