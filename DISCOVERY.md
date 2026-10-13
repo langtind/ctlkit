@@ -216,6 +216,8 @@ If a service truly has no way to renew a login, write that in `reference/README.
 
 **Renewal may not be a request of its own (skolectl, 2026-10).** The web client had no renewal code at all, and treated a 401 as logged out. The server renews instead: any request sent with the refresh token cookie is answered with a new access token in `Set-Cookie`. To find such a thing, wait until the access token has run out, send one request with a cookie jar (`curl -b jar -c jar`), and look at which cookies changed. Then send the cookies one subset at a time to learn which ones a request needs and which ones renew.
 
+**Leave the access token out of a renewal in `Set-Cookie` (skolectl, 2026-10).** A service that renews on any request hands out a new access token only when the one it was sent no longer works. With the stored access cookie in the request, `refresh` did nothing until that token had run out. Send the refresh token and whatever else the renewal needs, and nothing more. Run `refresh` twice in a row while the token is still good, and check that the expiry moves both times.
+
 **A token may hide in a cookie (skolectl, 2026-10).** A cookie whose value has two dots is a JWT. Decode the middle part and read `exp`, `iat`, `client_id` and `scope`, and leave `sub` and the names alone. That gave the lifetime of the access token before a single request had been timed.
 
 **A login can have more than two parts (skolectl, 2026-10).** A third part that never changes, such as a session id, goes in `Session.Extra`, and `Manager.RenewFrom` hands it to the renewal. Before ctlkit v0.3.0 it had to be packed into the refresh token. Set `Manager.Margin` when the access token is short: the default of five minutes renews a five minute token on every run.
