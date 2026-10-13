@@ -36,7 +36,7 @@ That gives `petctl pets`, `petctl pets --json --fields id,name`, `petctl pets --
 | Package | Holds |
 | --- | --- |
 | `ctlkit` | `Program`, the command table, `Call`, error kinds, `CheckID`, `Quote` |
-| `ctlkit/httpx` | `Do`, which turns an HTTP status into an error kind and never retries. `BrowserCookies` and `CookieCatcher` for a login that lives in cookies |
+| `ctlkit/httpx` | `Do`, which turns an HTTP status into an error kind and never retries. `BrowserCookies` and `CookieCatcher` for a login that lives in cookies. `Form` for a multipart body with JSON and files |
 | `ctlkit/keystore` | One secret in the system keyring, and `Memory` for tests |
 | `ctlkit/session` | A login that renews itself: access token, refresh token, `Extra` for what else it has, and renewal under a lock |
 | `ctlkit/ctltest` | `Contract`, which holds a tool to the conventions, and `Run` for a tool's own tests |

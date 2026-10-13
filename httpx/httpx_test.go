@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -100,5 +101,34 @@ func TestCookieCatcherKeepsWhatAnAnswerSet(t *testing.T) {
 	}
 	if caught["access"] != "new" {
 		t.Errorf("caught = %v", caught)
+	}
+}
+
+func TestFormCarriesJSONAndFiles(t *testing.T) {
+	var form Form
+	form.JSON("request", map[string]string{"reason": "choir"}).
+		File("attachments", FormFile{Name: "letter.pdf", Data: []byte("%PDF-1.7 made up")}).
+		File("attachments", FormFile{Name: "note.txt", ContentType: "text/plain", Data: []byte("hi")})
+	body, contentType, err := form.Body()
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req.Header.Set("Content-Type", contentType)
+	if err := req.ParseMultipartForm(1 << 20); err != nil {
+		t.Fatal(err)
+	}
+	files := req.MultipartForm.File["attachments"]
+	if req.FormValue("request") != `{"reason":"choir"}` || len(files) != 2 ||
+		files[0].Filename != "letter.pdf" || files[0].Header.Get("Content-Type") != "application/pdf" ||
+		files[1].Filename != "note.txt" || files[1].Header.Get("Content-Type") != "text/plain" {
+		t.Errorf("request = %q, files = %+v", req.FormValue("request"), files)
+	}
+}
+
+func TestFormReportsAValueThatIsNotJSON(t *testing.T) {
+	var form Form
+	if _, _, err := form.JSON("request", func() {}).Body(); err == nil {
+		t.Error("no error")
 	}
 }
