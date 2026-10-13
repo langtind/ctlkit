@@ -135,7 +135,8 @@ Answer these before the client is written. Write the answers in `reference/READM
 **Writes**
 
 - Observe the request. Do not build one from a guess or from somebody else's docstring.
-- What running it twice does.
+- What running it twice does, and whether the service has an idempotency key or a draft step. If it has neither, the tool looks before and after it sends, see "Changes" in CONVENTIONS.md.
+- The rules the web client's form checks before it sends: required fields, lengths, date limits, and for files the number, the size and the types. The service may not check them itself, so the tool does.
 - Run it for real only with the consent of whoever it concerns.
 
 ## Keep secrets and people out of the conversation
@@ -233,6 +234,12 @@ If a service truly has no way to renew a login, write that in `reference/README.
 **Time how long a refresh token lasts unused (skolectl, 2026-10).** The service did not say, so the tool was left alone and tried again: the login still renewed after 11 hours without a request. Write the longest gap that worked in `reference/README.md`, and raise it when a longer one works.
 
 **An agent may not be allowed to write a secret (skolectl, 2026-10).** `op read ... | gh secret set HOMEBREW_TAP_TOKEN` was refused when the agent ran it, although the secret never passed through the conversation. Do not look for a way around it. Give the user the one line to run themselves, with `!` in front in Claude Code.
+
+**A write can be read out of the web client without being sent (skolectl, 2026-10).** The bundle gave the path, the multipart body, the form's rules and the file limits for a leave application, and the read requests next to it were checked live. The write itself stays under "Unverified" in `reference/` until the user has agreed to one real one.
+
+**A login page may be another door to the same service (skolectl, 2026-10).** A new address turned out to be the school's login page for staff, with a link to the portal the tool already used. Follow the link before you conclude that the service has moved.
+
+**A list flag splits on commas (2026-10).** `Call.List` takes `a,b` as two values and drops repeats, so a file path with a comma in it cannot be given to a flag such as `--attach`. Say so in the flag's help.
 
 **go-keyring wraps long values (2026-10).** On macOS, a value that is long comes back from `security find-generic-password -w` as `go-keyring-base64:` followed by base64. Strip the prefix and decode before you use it by hand.
 

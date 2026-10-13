@@ -57,6 +57,7 @@ Every `*ctl` tool follows this contract. The reader of a tool's output is usuall
 - The question that `Call.Confirm` asks names the thing that changes, not only its id. **(you)**
 - Without `--yes`, the command asks. Without a terminal it refuses. Use `Call.Confirm`.
 - Say what running the command again does: nothing, the same thing, or one more. **(you)**
+- A write that the service does not make safe to repeat is never sent twice. Look for the thing before sending and refuse with `conflict` when it is there. After a timeout or a 5xx, look again instead of sending again, and when it still cannot be told, say that it is not known whether the change was made, with a hint not to run the command again. After a 2xx, look the thing up and return its id. **(you)**
 - Do not build a write from a guess. Observe the request first and keep it in `reference/`. **(you)**
 
 ## Secrets
