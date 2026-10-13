@@ -35,10 +35,10 @@ That gives `petctl pets`, `petctl pets --json --fields id,name`, `petctl pets --
 
 | Package | Holds |
 | --- | --- |
-| `ctlkit` | `Program`, the command table, `Call`, error kinds, `CheckID` |
-| `ctlkit/httpx` | `Do`, which turns an HTTP status into an error kind and never retries |
+| `ctlkit` | `Program`, the command table, `Call`, error kinds, `CheckID`, `Quote` |
+| `ctlkit/httpx` | `Do`, which turns an HTTP status into an error kind and never retries. `BrowserCookies` and `CookieCatcher` for a login that lives in cookies |
 | `ctlkit/keystore` | One secret in the system keyring, and `Memory` for tests |
-| `ctlkit/session` | A login that renews itself: access token, refresh token, and renewal under a lock |
+| `ctlkit/session` | A login that renews itself: access token, refresh token, `Extra` for what else it has, and renewal under a lock |
 | `ctlkit/ctltest` | `Contract`, which holds a tool to the conventions, and `Run` for a tool's own tests |
 
 ## What a tool gets
@@ -47,6 +47,8 @@ That gives `petctl pets`, `petctl pets --json --fields id,name`, `petctl pets --
 - **`Call.Print(v, render)`.** Prints `v` as JSON with `--json` and calls `render` otherwise. It applies `--fields` and prints an empty list as `[]`.
 - **`Call.Confirm(question)`.** `--yes` answers it. Without a terminal it refuses and names the flag.
 - **`Call.Secret(label, stdinFlag)`.** Reads a password from stdin or from a prompt without echo.
+- **`Call.Save(data, name)`.** Writes a fetched file under its own name or at `--output`, never outside the current directory by a name from the service, and never over a file that exists.
+- **`Command.Long`.** Help that does not fit in a summary, shown by `help <command>` and in the schema.
 - **`Arg{ID: true}`.** Refuses an id that holds a query string, an encoded character or a path.
 
 ## Test a tool

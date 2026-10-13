@@ -19,6 +19,7 @@ ctlkit is the Go module every `*ctl` tool is built on. It holds the command tabl
 - `errors.go` holds the error kinds and their exit codes. The `kinds` table is the one list, read by help and schema.
 - `help.go`, `schema.go` and `skill.go` hold the built-in commands.
 - `validate.go` holds the input checks.
+- `file.go` holds `Call.Save`, `FileName` and `Quote`.
 - `httpx/` holds the HTTP plumbing, `keystore/` the keyring, `session/` the login that renews itself, `ctltest/` the contract test.
 - `ctlkit_test.go` builds a small tool, `petctl`, and runs the contract and the behaviour tests against it.
 

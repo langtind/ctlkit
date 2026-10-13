@@ -190,3 +190,34 @@ func TestClearLogsOut(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestExtraSurvivesARenewalThatReturnsNone(t *testing.T) {
+	m, _ := manager(t, Session{})
+	m.Renew = nil
+	m.RenewFrom = func(ctx context.Context, stored Session) (Session, error) {
+		if stored.Extra["sid"] != "s1" || stored.RefreshToken != "r1" {
+			t.Errorf("RenewFrom got %+v", stored)
+		}
+		return Session{AccessToken: "a2", AccessExpires: now.Add(time.Hour)}, nil
+	}
+	if err := m.Save(Session{AccessToken: "a1", AccessExpires: now.Add(-time.Minute), RefreshToken: "r1", Extra: map[string]string{"sid": "s1"}}); err != nil {
+		t.Fatal(err)
+	}
+	token, err := m.Token(context.Background())
+	got, _ := m.Load()
+	if err != nil || token != "a2" || got.RefreshToken != "r1" || got.Extra["sid"] != "s1" {
+		t.Errorf("token = %q, err = %v, stored = %+v", token, err, got)
+	}
+}
+
+func TestJWTExpiry(t *testing.T) {
+	// The payload is {"exp":1791806400}.
+	if got := JWTExpiry("e30.eyJleHAiOjE3OTE4MDY0MDB9.sig"); !got.Equal(time.Unix(1791806400, 0)) {
+		t.Errorf("JWTExpiry = %v", got)
+	}
+	for _, token := range []string{"", "opaque", "a.b.c", "e30.e30.sig"} {
+		if got := JWTExpiry(token); !got.IsZero() {
+			t.Errorf("JWTExpiry(%q) = %v", token, got)
+		}
+	}
+}

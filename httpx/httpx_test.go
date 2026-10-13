@@ -66,3 +66,39 @@ func TestNoAnswerIsUnavailable(t *testing.T) {
 		t.Errorf("kind = %s, err = %v", ctlkit.KindOf(err), err)
 	}
 }
+
+func TestBrowserCookiesKeepsOneHost(t *testing.T) {
+	state := `{"cookies":[
+		{"name":"access","value":"a","domain":"app.example.invalid"},
+		{"name":"sid","value":"s","domain":".app.example.invalid"},
+		{"name":"other","value":"o","domain":"login.example.invalid"}],"origins":[]}`
+	got, err := BrowserCookies([]byte(state), "app.example.invalid")
+	if err != nil || len(got) != 2 || got["access"] != "a" || got["sid"] != "s" {
+		t.Errorf("cookies = %v, err = %v", got, err)
+	}
+	if _, err := BrowserCookies([]byte("not json"), "app.example.invalid"); ctlkit.KindOf(err) != ctlkit.KindUsage {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestCookieCatcherKeepsWhatAnAnswerSet(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Cookie") != "" {
+			t.Errorf("the catcher sent %q", r.Header.Get("Cookie"))
+		}
+		http.SetCookie(w, &http.Cookie{Name: "access", Value: "new"})
+	}))
+	defer srv.Close()
+	caught := CookieCatcher{}
+	client := *srv.Client()
+	client.Jar = caught
+	for range 2 {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+		if _, err := Do(&client, req, "Test", "test/1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if caught["access"] != "new" {
+		t.Errorf("caught = %v", caught)
+	}
+}

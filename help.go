@@ -53,6 +53,9 @@ func exitCodeList() string {
 
 func (p *Program) printCommandHelp(w io.Writer, cmd *Command) {
 	fmt.Fprintf(w, "%[1]s %[2]s - %[3]s\n\nUsage:\n  %[1]s %[4]s\n", p.Name, cmd.Name, cmd.Summary, cmd.usage())
+	if cmd.Long != "" {
+		fmt.Fprintf(w, "\n%s\n", strings.TrimSpace(cmd.Long))
+	}
 	if cmd.Mutates {
 		fmt.Fprintln(w, "\nThis command changes something at the service. Run it with --dry-run first.")
 	}

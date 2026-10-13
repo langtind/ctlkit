@@ -3,6 +3,7 @@ package ctlkit
 import (
 	"context"
 	"strconv"
+	"strings"
 )
 
 // schemaDocument describes the command line for a program. It is built from
@@ -27,6 +28,8 @@ type schemaCommand struct {
 	Name    string `json:"name"`
 	Usage   string `json:"usage"`
 	Summary string `json:"summary"`
+	// Description is the long help, for a command that has one.
+	Description string `json:"description,omitempty"`
 	// Mutates is true when the command changes something at the service.
 	Mutates bool         `json:"mutates"`
 	Args    []schemaArg  `json:"args"`
@@ -64,12 +67,13 @@ func (p *Program) schema(ctx context.Context, c *Call) error {
 	}
 	for _, cmd := range p.table() {
 		entry := schemaCommand{
-			Name:    cmd.Name,
-			Usage:   p.Name + " " + cmd.usage(),
-			Summary: cmd.Summary,
-			Mutates: cmd.Mutates,
-			Args:    []schemaArg{},
-			Flags:   []schemaFlag{},
+			Name:        cmd.Name,
+			Usage:       p.Name + " " + cmd.usage(),
+			Summary:     cmd.Summary,
+			Description: strings.TrimSpace(cmd.Long),
+			Mutates:     cmd.Mutates,
+			Args:        []schemaArg{},
+			Flags:       []schemaFlag{},
 		}
 		for _, arg := range cmd.Args {
 			entry.Args = append(entry.Args, schemaArg{Name: arg.Name, Required: arg.Required, Variadic: arg.Variadic, Help: sentence(arg.Help)})

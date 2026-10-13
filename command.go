@@ -55,8 +55,12 @@ type Command struct {
 	// Name is one word, or two for a subcommand such as "watch add".
 	Name    string
 	Summary string
-	Args    []Arg
-	Flags   []Flag
+	// Long is help that does not fit in the summary: full sentences, shown
+	// by "help <command>" and in the schema. Put the steps of a login that
+	// needs a browser here, and not in a hint.
+	Long  string
+	Args  []Arg
+	Flags []Flag
 	// Mutates is true when the command changes something at the service.
 	// Such a command takes DryRunFlag and YesFlag.
 	Mutates bool
@@ -69,6 +73,8 @@ var (
 	FieldsFlag = Flag{Name: "fields", Kind: List, Value: "field", Help: "with --json, keep only these fields of each item"}
 	YesFlag    = Flag{Name: "yes", Kind: Bool, Help: "make the change without asking for confirmation"}
 	DryRunFlag = Flag{Name: "dry-run", Kind: Bool, Help: "show what would be sent, and send nothing"}
+	// OutputFlag is where Call.Save writes a fetched file.
+	OutputFlag = Flag{Name: "output", Kind: String, Value: "path", Help: "where to write the file, instead of under its own name in the current directory"}
 )
 
 // LimitFlag is --limit with a default and a highest value.

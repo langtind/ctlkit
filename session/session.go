@@ -38,6 +38,10 @@ type Session struct {
 	AccessExpires  time.Time `json:"accessExpires,omitzero"`
 	RefreshToken   string    `json:"refreshToken,omitempty"`
 	RefreshExpires time.Time `json:"refreshExpires,omitzero"`
+
+	// Extra holds what a login has besides the two tokens, such as a
+	// session id that never changes. A renewal that returns none keeps it.
+	Extra map[string]string `json:"extra,omitempty"`
 }
 
 // Manager stores a session and renews it.
@@ -47,6 +51,11 @@ type Manager struct {
 	// Renew trades a refresh token for a new session at the service. A
 	// service that has no refresh tokens leaves it nil.
 	Renew func(ctx context.Context, refreshToken string) (Session, error)
+
+	// RenewFrom is Renew for a service that needs more than the refresh
+	// token to renew, such as a cookie kept in Extra. It gets the whole
+	// stored session. When both are set, RenewFrom is used.
+	RenewFrom func(ctx context.Context, stored Session) (Session, error)
 
 	// LockPath is the file one run holds while it renews. See LockFile.
 	LockPath string
@@ -151,14 +160,19 @@ func (m *Manager) renew(ctx context.Context, stale string, force bool) (string, 
 	if !force && m.fresh(s) {
 		return s.AccessToken, nil
 	}
-	if m.Renew == nil || s.RefreshToken == "" {
+	if (m.Renew == nil && m.RenewFrom == nil) || s.RefreshToken == "" {
 		return "", ErrExpired
 	}
 	if !s.RefreshExpires.IsZero() && !m.now().Before(s.RefreshExpires) {
 		return "", ErrExpired
 	}
 
-	renewed, err := m.Renew(ctx, s.RefreshToken)
+	var renewed Session
+	if m.RenewFrom != nil {
+		renewed, err = m.RenewFrom(ctx, s)
+	} else {
+		renewed, err = m.Renew(ctx, s.RefreshToken)
+	}
 	if err != nil {
 		// Only a clear no from the service means the login is over. A
 		// network failure says nothing about it.
@@ -173,6 +187,9 @@ func (m *Manager) renew(ctx context.Context, stale string, force bool) (string, 
 	// A service that does not rotate refresh tokens leaves the old one valid.
 	if renewed.RefreshToken == "" {
 		renewed.RefreshToken, renewed.RefreshExpires = s.RefreshToken, s.RefreshExpires
+	}
+	if renewed.Extra == nil {
+		renewed.Extra = s.Extra
 	}
 	if err := m.Save(renewed); err != nil {
 		return "", fmt.Errorf("store the renewed login in the keyring: %w", err)

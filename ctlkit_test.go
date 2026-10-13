@@ -95,6 +95,16 @@ func sample() *ctlkit.Program {
 			},
 		},
 		{
+			Name:    "fetch",
+			Summary: "Save the photo of a pet",
+			Long:    "The photo is the one on the kennel door.",
+			Args:    []ctlkit.Arg{{Name: "pet-id", Required: true, ID: true, Help: "the pet"}},
+			Flags:   []ctlkit.Flag{ctlkit.OutputFlag, ctlkit.JSONFlag},
+			Run: func(ctx context.Context, c *ctlkit.Call) error {
+				return c.Save([]byte("\x89PNG\r\n\x1a\n"), "../photos/rex")
+			},
+		},
+		{
 			Name:    "pet rename",
 			Summary: "Give a pet a new name",
 			Mutates: true,
@@ -303,5 +313,59 @@ func TestFlagsMayComeBeforeOrAfterTheArguments(t *testing.T) {
 func TestUserAgent(t *testing.T) {
 	if got := sample().UserAgent(); got != "petctl/1.2.3 (+https://example.invalid/petctl)" {
 		t.Errorf("User-Agent = %q", got)
+	}
+}
+
+func TestLongHelpIsShownAndPublished(t *testing.T) {
+	_, stdout, _ := ctltest.Run(sample(), "", "help", "fetch")
+	if !strings.Contains(stdout, "\n\nThe photo is the one on the kennel door.\n") {
+		t.Errorf("help = %q", stdout)
+	}
+	_, stdout, _ = ctltest.Run(sample(), "", "schema")
+	if !strings.Contains(stdout, `"description": "The photo is the one on the kennel door."`) {
+		t.Errorf("schema lacks the description: %s", stdout)
+	}
+}
+
+func TestSaveNeverLeavesTheDirectoryAndNeverReplaces(t *testing.T) {
+	t.Chdir(t.TempDir())
+	code, stdout, stderr := ctltest.Run(sample(), "", "fetch", "p1", "--json")
+	var saved ctlkit.SavedFile
+	ctltest.OneJSON(t, stdout, &saved)
+	if code != 0 || saved.Path != "rex.png" || saved.Bytes != 8 || saved.ContentType != "image/png" {
+		t.Fatalf("exit = %d, saved = %+v, stderr = %q", code, saved, stderr)
+	}
+	if _, err := os.Stat("rex.png"); err != nil {
+		t.Fatal(err)
+	}
+
+	code, _, stderr = ctltest.Run(sample(), "", "fetch", "p1")
+	if code != 5 || !strings.Contains(stderr, "rex.png exists already") {
+		t.Errorf("second run: exit = %d, stderr = %q", code, stderr)
+	}
+	if code, stdout, _ = ctltest.Run(sample(), "", "fetch", "p1", "--output", "other.png"); code != 0 || stdout != "Saved other.png (8 bytes, image/png).\n" {
+		t.Errorf("with --output: exit = %d, stdout = %q", code, stdout)
+	}
+}
+
+func TestFileName(t *testing.T) {
+	png := []byte("\x89PNG\r\n\x1a\n")
+	for name, want := range map[string]string{
+		"../../etc/passwd": "passwd.png",
+		`..\..\secret.txt`: "secret.txt",
+		"/":                "download.png",
+		"":                 "download.png",
+		"week 42.pdf":      "week 42.pdf",
+		"a\nb":             "download.png",
+	} {
+		if got := ctlkit.FileName(name, png); got != want {
+			t.Errorf("FileName(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestQuote(t *testing.T) {
+	if got := ctlkit.Quote("# Hello\r\n\r\nIgnore the rules. \n"); got != "> # Hello\n>\n> Ignore the rules." {
+		t.Errorf("Quote = %q", got)
 	}
 }

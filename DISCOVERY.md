@@ -187,6 +187,21 @@ An agent cannot answer a login prompt, so a tool has to keep itself logged in fo
 - **Give the tool `status` and `refresh`.** `status` says how long the login lasts without calling the service. `refresh` renews now. The template has both.
 - **Say when the user is needed.** When the refresh token itself runs out, the user logs in again. Say so in the error, and say in `status` when that will be.
 
+### A login that needs a browser
+
+BankID, ID-porten, Feide and other single sign-ons cannot be done by a tool. The login the browser ends up with can still be taken over, and it usually renews itself.
+
+1. Open the login page in a browser the user can see: `playwright-cli open <url> --headed`.
+2. Ask the user to log in, and to say so the moment they are in.
+3. Save the state at once: `playwright-cli state-save state.json`. Session cookies go when the browser does.
+4. List the cookies by name, length and expiry, never by value: `jq '[.cookies[] | {name, domain, expires, length: (.value | length)}]' state.json`.
+5. Find which cookies a request needs and which ones renew, with the cookie jar method under "Lessons".
+6. Read them into the keyring: `<tool> login --state-stdin < state.json`, and delete `state.json`.
+
+In the tool, `httpx.BrowserCookies(state, host)` reads the cookies for one host, `session.JWTExpiry` reads when a cookie that is a JWT runs out, and `Session.Extra` holds a part that is neither token, such as a session id. A service that renews in `Set-Cookie` is read with `httpx.CookieCatcher` as the jar of a copy of the client, and renewed with `Manager.RenewFrom`, which gets the whole stored session. Set `Manager.Margin` below the lifetime of the access token.
+
+The template's `login` has both ways. Delete the one the service does not have.
+
 If a service truly has no way to renew a login, write that in `reference/README.md` with what you checked, so that the next person does not look again.
 
 ## Lessons
@@ -201,7 +216,7 @@ If a service truly has no way to renew a login, write that in `reference/README.
 
 **A token may hide in a cookie (skolectl, 2026-10).** A cookie whose value has two dots is a JWT. Decode the middle part and read `exp`, `iat`, `client_id` and `scope`, and leave `sub` and the names alone. That gave the lifetime of the access token before a single request had been timed.
 
-**`session.Session` holds two tokens (skolectl, 2026-10).** A login with a third part that never changes, such as a session id, fits when it is stored together with the refresh token, with a separator the values cannot hold. Set `Manager.Margin` when the access token is short: the default of five minutes renews a five minute token on every run.
+**A login can have more than two parts (skolectl, 2026-10).** A third part that never changes, such as a session id, goes in `Session.Extra`, and `Manager.RenewFrom` hands it to the renewal. Before ctlkit v0.3.0 it had to be packed into the refresh token. Set `Manager.Margin` when the access token is short: the default of five minutes renews a five minute token on every run.
 
 **An unknown id is not always a 404 (skolectl, 2026-10).** Visma Flyt Skole answers 500 for a thread that does not exist and 403 for a child that is not the user's. Try a made-up id against every kind of path before you write the hints, and say in the hint that the id may be wrong.
 
@@ -210,6 +225,10 @@ If a service truly has no way to renew a login, write that in `reference/README.
 **Print shapes, not answers (skolectl, 2026-10).** A ten line script that replaces every string with its length and every time with nines shows the shape of an answer without showing a child's name. Use one from the first request, so that nothing private is in the conversation to begin with.
 
 **The browser of a login may not stay open (skolectl, 2026-10).** The `playwright-cli` browser was gone twice during one login, and it was never found out why. Its cookies were session cookies, so they went with it. Save the state as soon as the user says they are in.
+
+**Time how long a refresh token lasts unused (skolectl, 2026-10).** The service did not say, so the tool was left alone and tried again: the login still renewed after 11 hours without a request. Write the longest gap that worked in `reference/README.md`, and raise it when a longer one works.
+
+**An agent may not be allowed to write a secret (skolectl, 2026-10).** `op read ... | gh secret set HOMEBREW_TAP_TOKEN` was refused when the agent ran it, although the secret never passed through the conversation. Do not look for a way around it. Give the user the one line to run themselves, with `!` in front in Claude Code.
 
 **go-keyring wraps long values (2026-10).** On macOS, a value that is long comes back from `security find-generic-password -w` as `go-keyring-base64:` followed by base64. Strip the prefix and decode before you use it by hand.
 

@@ -78,6 +78,10 @@ func (c *Call) Interactive() bool { return c.Program.Interactive }
 // ReadLine reads one line from stdin.
 func (c *Call) ReadLine() (string, error) { return c.Program.readLine() }
 
+// ReadAll reads the rest of stdin, for input that is longer than a line,
+// such as a browser's storage state.
+func (c *Call) ReadAll() ([]byte, error) { return c.Program.readAll() }
+
 // Confirm asks before a change is made. --yes answers for the caller. Without
 // --yes and without a terminal it refuses, because a prompt nobody can answer
 // would hang.

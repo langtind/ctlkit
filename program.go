@@ -283,6 +283,13 @@ func (p *Program) version(ctx context.Context, c *Call) error {
 	return nil
 }
 
+func (p *Program) readAll() ([]byte, error) {
+	if p.reader == nil {
+		p.reader = bufio.NewReader(p.Stdin)
+	}
+	return io.ReadAll(p.reader)
+}
+
 func (p *Program) readLine() (string, error) {
 	if p.reader == nil {
 		p.reader = bufio.NewReader(p.Stdin)
