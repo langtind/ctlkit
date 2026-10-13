@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# bundle-paths - list what looks like request paths in a fetched web client.
+#
+#   bundle-paths <dir> [filter]
+#
+# It prints every quoted string in the files of <dir> that looks like a
+# path, with the number of times it occurs. Template parts such as ${id}
+# are kept. filter is a regular expression that keeps only some of them:
+#
+#   bundle-paths bundle 'api|/v[0-9]'
+#
+# A path alone says little. See how it is called with bundle-grep.
+set -euo pipefail
+
+[ $# -ge 1 ] && [ $# -le 2 ] && [ -d "$1" ] || { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+dir=$1 filter=${2:-.}
+
+cat "$dir"/* 2>/dev/null \
+    | grep -oE "[\"'\`]/?[A-Za-z0-9_\$\{\}.-]+(/[A-Za-z0-9_\$\{\}.:?=&-]+)+/?[\"'\`]" \
+    | sed -E "s/^.//; s/.\$//" \
+    | grep -vE '\.(js|css|svg|png|jpe?g|gif|woff2?|ttf|map|ico|html)$' \
+    | grep -vE '^(application|text|image|audio|video|font|multipart)/' \
+    | grep -E -- "$filter" \
+    | sort | uniq -c | sort -k2 \
+    || true

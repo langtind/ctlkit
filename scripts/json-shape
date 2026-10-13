@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# json-shape - print the shape of a JSON answer, and none of what it says.
+#
+#   curl -s ... | json-shape
+#   tool things --json | json-shape
+#
+# Every string becomes its length, every number "number", and every time
+# "time". A list shows its first item and how many it holds. Use it from
+# the first request, so that no name, message or id of a real person is in
+# the conversation to begin with. Key names are kept: if a service uses a
+# person's name as a key, this does not hide it.
+set -euo pipefail
+
+[ $# -eq 0 ] || { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+
+jq '
+def shape:
+  if type == "object" then with_entries(.value |= shape)
+  elif type == "array" then
+    if length == 0 then [] else [(.[0] | shape), "\(length) in all"] end
+  elif type == "string" then
+    if test("^[0-9]{4}-[0-9]{2}-[0-9]{2}([T ][0-9]{2}:[0-9]{2})?") then "time"
+    elif test("^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$") and length > 40 then "jwt(\(length))"
+    else "string(\(length))" end
+  elif type == "number" then "number"
+  else . end;
+shape'

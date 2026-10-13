@@ -4,6 +4,53 @@ How to find out how a service works before you write its client. Most services a
 
 This file is a guide, and a log. When a tool teaches you something that would have saved time on the one before, add it under "Lessons".
 
+The checklist comes first, then where to find the answers, then how to keep a login, and last the lessons, which grow. The scripts it names are in [`scripts/`](scripts/) in ctlkit. Each prints what it does when run without arguments. Use them instead of writing your own: they are tested, and they keep values out of the conversation.
+
+| Script | Does |
+| --- | --- |
+| `bundle-fetch <page-url> <new-dir>` | Downloads a web client's script files, chunks and all |
+| `bundle-paths <dir> [filter]` | Lists what looks like request paths in them |
+| `bundle-grep <dir> <text> [characters]` | Shows what stands around a string: the method, the body, the form's checks |
+| `json-shape` | Prints the shape of a JSON answer on stdin, and none of what it says |
+| `cookie-matrix <state.json> <cookie-host> <url>` | Sends one request for every combination of cookies, and prints status and the names of what was set |
+
+## What to find out
+
+Answer these before the client is written. Write the answers in `reference/README.md`.
+
+**Login**
+
+- The path, the body, and what a wrong password answers.
+- What an account with two-factor login answers. It may be a 200 with a challenge and a phone number in it. Never print that answer.
+- Whether a captcha or a client id stands in the way.
+
+**Tokens**
+
+- Every token the login answers with, and when each runs out. Read the expiry fields in the answer. Do not assume there is one token.
+- Whether there is a refresh token. If the login answer has one, there is a way to use it.
+- The renewal request: path, body, and what it answers.
+- Whether renewal hands out a new refresh token. If it does, the old one works once, and the new pair must be stored before anything else happens.
+- What a refused renewal looks like. That, and only that, means the user has to log in again.
+- When the service's own client renews: before the token runs out, on a 401, or both.
+
+**Requests**
+
+- Headers the service insists on: a client id, a client version, a user agent.
+- The order of a list, and how to change it. Check it together with the limit.
+- Paging, the highest limit, and what happens past it.
+- Rate limits, and whether a 429 carries `Retry-After`.
+- The shape of an error body, so that the message can be shown.
+- How times are written, in answers and in queries.
+- Whether a file is fetched with the token or without it, and from which host.
+
+**Writes**
+
+- Observe the request. Do not build one from a guess or from somebody else's docstring.
+- What running it twice does, and whether the service has an idempotency key or a draft step. If it has neither, the tool looks before and after it sends, see "Changes" in CONVENTIONS.md.
+- The rules the web client's form checks before it sends: required fields, lengths, date limits, and for files the number, the size and the types. The service may not check them itself, so the tool does.
+- Run it for real only with the consent of whoever it concerns.
+- A write that cannot be tried, because it reaches other people, is read out of the web client and stays under "Unverified" in `reference/`. Tell the user that the first real use is the test.
+
 ## Where to look, cheapest first
 
 Stop at the first source that answers the question. Each step down costs more setup and puts more of other people's data in front of you.
@@ -20,23 +67,16 @@ An open client is a lead, not a fact. It shows what worked for its author when i
 
 ### 3. Read the web client
 
-The web client is the service's own code, and it is public. Download the page, find the script bundle, and search it. This is the fastest way to learn how login and renewal work, because the code says it outright.
+The web client is the service's own code, and it is public. This is the fastest way to learn how login and renewal work, because the code says it outright. It also holds every request the service has, and the rules its forms check before they send.
 
 ```bash
-curl -sL https://example.com/app -o index.html
-grep -oE 'src="[^"]+\.js[^"]*"' index.html       # find the bundle
-curl -sL https://example.com/app/main-abc123.js -o main.js
+S=~/Developer/Private/ctlkit/scripts
+$S/bundle-fetch https://example.com/app/ bundle      # every script file, chunks and all
+$S/bundle-paths bundle 'api|/v[0-9]'                 # what looks like a request path
+$S/bundle-grep bundle '/auth/refresh' 400            # what stands around one of them
 ```
 
-A bundle is tens of megabytes on few lines, and `grep` with a long pattern gives up on it. Search it with a few lines of Python:
-
-```python
-import re
-s = open("main.js", encoding="utf-8", errors="replace").read()
-print(sorted(set(m.group(0) for m in re.finditer(r"auth2?/[A-Za-z0-9/_-]*", s))))
-i = s.find("refreshToken")
-print(s[max(0, i - 300):i + 900])
-```
+A web client is often split into a hundred chunks, and the paths are rarely in the first file. `bundle-fetch` follows the names from file to file. A minified file is one long line, so plain `grep` prints all of it or nothing. `bundle-grep` prints some characters on either side of each hit.
 
 Search for: `refresh`, `renew`, `token`, `Authorization`, `login`, `/auth`, `expiration`, `X-`, and the API host. Read the whole function around a hit. It shows the request body, which fields of the answer are kept, and what the client does on a 401.
 
@@ -61,7 +101,13 @@ tmplctl thing <id> --raw | jq 'keys'
 tmplctl thing <id> --raw | jq '{attachments, responseKeys: (.responses | keys)}'
 ```
 
-Look at keys and types. Do not print a whole answer into the conversation or into a file in the repo: it holds real people.
+Or print the shape of the whole answer, with every value replaced by its type and length:
+
+```bash
+tmplctl thing <id> --raw | ~/Developer/Private/ctlkit/scripts/json-shape
+```
+
+Look at keys and types. Do not print a whole answer into the conversation or into a file in the repo: it holds real people. Use `json-shape` from the first request, so that nothing private is in the conversation to begin with.
 
 ### 5. Sniff the traffic
 
@@ -102,42 +148,6 @@ A capture of a login is the most useful one there is. It shows every token, and 
 When the app shows a network error as soon as the proxy is on, it pins its certificate. Then the proxy will not work without changing the app. Go back to the web client, or to an older or a different client of the same service.
 
 **Afterwards.** A capture holds a login token and other people's data. Extract the request and the field names, write them in `reference/`, and delete the capture. Never commit one. `.gitignore` in the template already refuses `*.har` and `*.proxymansession`.
-
-## What to find out
-
-Answer these before the client is written. Write the answers in `reference/README.md`.
-
-**Login**
-
-- The path, the body, and what a wrong password answers.
-- What an account with two-factor login answers. It may be a 200 with a challenge and a phone number in it. Never print that answer.
-- Whether a captcha or a client id stands in the way.
-
-**Tokens**
-
-- Every token the login answers with, and when each runs out. Read the expiry fields in the answer. Do not assume there is one token.
-- Whether there is a refresh token. If the login answer has one, there is a way to use it.
-- The renewal request: path, body, and what it answers.
-- Whether renewal hands out a new refresh token. If it does, the old one works once, and the new pair must be stored before anything else happens.
-- What a refused renewal looks like. That, and only that, means the user has to log in again.
-- When the service's own client renews: before the token runs out, on a 401, or both.
-
-**Requests**
-
-- Headers the service insists on: a client id, a client version, a user agent.
-- The order of a list, and how to change it. Check it together with the limit.
-- Paging, the highest limit, and what happens past it.
-- Rate limits, and whether a 429 carries `Retry-After`.
-- The shape of an error body, so that the message can be shown.
-- How times are written, in answers and in queries.
-- Whether a file is fetched with the token or without it, and from which host.
-
-**Writes**
-
-- Observe the request. Do not build one from a guess or from somebody else's docstring.
-- What running it twice does, and whether the service has an idempotency key or a draft step. If it has neither, the tool looks before and after it sends, see "Changes" in CONVENTIONS.md.
-- The rules the web client's form checks before it sends: required fields, lengths, date limits, and for files the number, the size and the types. The service may not check them itself, so the tool does.
-- Run it for real only with the consent of whoever it concerns.
 
 ## Keep secrets and people out of the conversation
 
@@ -196,8 +206,12 @@ BankID, ID-porten, Feide and other single sign-ons cannot be done by a tool. The
 2. Ask the user to log in, and to say so the moment they are in.
 3. Save the state at once: `playwright-cli state-save state.json`. Session cookies go when the browser does.
 4. List the cookies by name, length and expiry, never by value: `jq '[.cookies[] | {name, domain, expires, length: (.value | length)}]' state.json`.
-5. Find which cookies a request needs and which ones renew, with the cookie jar method under "Lessons".
+5. Find which cookies a request needs and which ones renew: `scripts/cookie-matrix state.json <cookie-host> <url>`. It prints names and statuses only. Run it once at once and once after the access token has run out, since a renewal shows only then.
 6. Read them into the keyring: `<tool> login --state-stdin < state.json`, and delete `state.json`.
+
+Do not wait for `playwright-cli close` to return: it has been seen to hang. Run it in the background or leave the browser to the user. Never copy a stored login from one machine to another yourself. Give the user the commands to log in there.
+
+When the renewal is found, send only what it needs. A service that renews on any request hands out a new access token only when the one it was sent no longer works, so a renewal that carries the stored access token does nothing. `ctltest.RefreshRenewsEveryTime` checks this against the fake, and `refresh` twice in a row checks it against the real service. Run both again after every change to the login code.
 
 In the tool, `httpx.BrowserCookies(state, host)` reads the cookies for one host, `session.JWTExpiry` reads when a cookie that is a JWT runs out, and `Session.Extra` holds a part that is neither token, such as a session id. A service that renews in `Set-Cookie` is read with `httpx.CookieCatcher` as the jar of a copy of the client, and renewed with `Manager.RenewFrom`, which gets the whole stored session. Set `Manager.Margin` below the lifetime of the access token.
 

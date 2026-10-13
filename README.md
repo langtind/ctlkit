@@ -6,6 +6,8 @@ A tool fills in a table of commands. ctlkit parses the flags from the table, pri
 
 The tools are written for AI agents first. [CONVENTIONS.md](CONVENTIONS.md) describes the contract they share. [DISCOVERY.md](DISCOVERY.md) describes how to find out how a service works before its client is written: where to look, what to find out about login and tokens, and what earlier tools got wrong.
 
+[API.md](API.md) has everything a tool uses on one page, [UPGRADING.md](UPGRADING.md) says what each version adds and what it replaces in a tool, and [`scripts/`](scripts/) holds the scripts for reading a web client, a cookie login and the shape of an answer.
+
 To start a new tool, use [ctl-template](https://github.com/langtind/ctl-template).
 
 ## A command
@@ -39,7 +41,7 @@ That gives `petctl pets`, `petctl pets --json --fields id,name`, `petctl pets --
 | `ctlkit/httpx` | `Do`, which turns an HTTP status into an error kind and never retries. `BrowserCookies` and `CookieCatcher` for a login that lives in cookies. `Form` for a multipart body with JSON and files |
 | `ctlkit/keystore` | One secret in the system keyring, and `Memory` for tests |
 | `ctlkit/session` | A login that renews itself: access token, refresh token, `Extra` for what else it has, and renewal under a lock |
-| `ctlkit/ctltest` | `Contract`, which holds a tool to the conventions, and `Run` for a tool's own tests |
+| `ctlkit/ctltest` | `Contract`, which holds a tool to the conventions, `NewFake`, a service that does not exist, and the checks every tool runs |
 
 ## What a tool gets
 

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# cookie-matrix - find out which cookies a request needs, and which renew.
+#
+#   cookie-matrix <state.json> <cookie-host> <url> [curl options...]
+#
+# <state.json> is a browser's storage state, as "playwright-cli state-save"
+# writes it. The script sends one GET to <url> for every combination of the
+# cookies stored for <cookie-host>, and prints the names that were sent, the
+# status, and the names of the cookies the answer set. It never prints a
+# value. Extra arguments go to curl, for a header the service insists on:
+#
+#   cookie-matrix state.json app.example.com https://api.example.com/v1/me -H 'Accept: application/json'
+#
+# A cookie that turns a 401 into a 200 is needed. A combination that is
+# answered with Set-Cookie renews. Mind two things. A service that hands
+# out a new refresh token each time may end the login in state.json, so be
+# ready to log in again. And the access token must have run out before a
+# renewal shows: run this once at once, and once after it has.
+set -euo pipefail
+
+usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+[ $# -ge 3 ] && [ -f "$1" ] || usage
+state=$1 host=$2 url=$3
+shift 3
+
+names=()
+while IFS= read -r name; do names+=("$name"); done < <(
+    jq -r --arg host "$host" '[.cookies[] | select((.domain | ltrimstr(".")) == $host) | .name] | unique | .[]' "$state")
+n=${#names[@]}
+[ "$n" -gt 0 ] || { echo "Error: $state holds no cookies for $host." >&2; exit 2; }
+[ "$n" -le 6 ] || { echo "Error: $n cookies for $host is too many to try every combination of. Remove some from a copy of the state." >&2; exit 2; }
+
+printf '%-6s  %-40s  %s\n' STATUS SENT SET
+for ((mask = 0; mask < (1 << n); mask++)); do
+    sent=() header=""
+    for ((i = 0; i < n; i++)); do
+        if ((mask >> i & 1)); then
+            sent+=("${names[i]}")
+            value=$(jq -r --arg host "$host" --arg name "${names[i]}" \
+                'first(.cookies[] | select((.domain | ltrimstr(".")) == $host and .name == $name) | .value)' "$state")
+            header+="${names[i]}=$value; "
+        fi
+    done
+    args=(-s -o /dev/null -D - --max-time 30)
+    [ -z "$header" ] || args+=(-H "Cookie: ${header%; }")
+    answer=$(curl "${args[@]}" "$@" "$url" || true)
+    status=$(printf '%s\n' "$answer" | awk 'toupper($1) ~ /^HTTP/ {code = $2} END {print code ? code : "none"}')
+    set_names=$(printf '%s\n' "$answer" | tr -d '\r' | awk -F'[:=]' 'tolower($1) == "set-cookie" {gsub(/^ +/, "", $2); print $2}' | sort -u | paste -sd, -)
+    printf '%-6s  %-40s  %s\n' "$status" "$(IFS=,; echo "${sent[*]:-(none)}")" "${set_names:--}"
+done

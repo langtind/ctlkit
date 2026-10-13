@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# bundle-grep - show what stands around a string in a fetched web client.
+#
+#   bundle-grep <dir> <text> [characters]
+#
+# A minified file is one long line, so grep prints all of it or nothing.
+# This prints each place <text> occurs with some characters on either side,
+# 200 unless told otherwise. <text> is taken as it is, not as a pattern.
+# Use it on a path from bundle-paths to read the method, the body and the
+# checks the form makes before it sends:
+#
+#   bundle-grep bundle '/applications' 400
+set -euo pipefail
+
+[ $# -ge 2 ] && [ $# -le 3 ] && [ -d "$1" ] || { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+dir=$1 text=$2 around=${3:-200}
+[[ $around =~ ^[0-9]+$ ]] || { echo "Error: the number of characters must be a number." >&2; exit 2; }
+
+quoted=$(printf '%s' "$text" | sed -E 's/[][\.*^$(){}?+|/\\]/\\&/g')
+for file in "$dir"/*; do
+    [ -f "$file" ] || continue
+    grep -oE ".{0,$around}$quoted.{0,$around}" "$file" 2>/dev/null | while IFS= read -r hit; do
+        printf '%s:\n  %s\n\n' "$(basename "$file")" "$hit"
+    done || true
+done

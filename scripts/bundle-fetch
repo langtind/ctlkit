@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# bundle-fetch - download the script files of a web client, chunks and all.
+#
+#   bundle-fetch <page-url> <new-dir>
+#
+# It reads the page, fetches every script it names, and then every .js file
+# those name, until no new one turns up. A web client is often split into a
+# hundred chunks, and the request paths are rarely in the first file. Only
+# files on the page's own host are fetched, with no cookies and no login.
+# Read the result with bundle-paths and bundle-grep.
+set -euo pipefail
+
+usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+[ $# -eq 2 ] || usage
+page=$1 dir=$2
+[[ $page =~ ^https?://[^/]+ ]] || usage
+origin=${BASH_REMATCH[0]}
+[ ! -e "$dir" ] || { echo "Error: $dir exists already. Give a new directory." >&2; exit 2; }
+mkdir -p "$dir"
+max=${BUNDLE_MAX_FILES:-600}
+
+# resolve <base-url> <reference> prints the address a reference means.
+resolve() {
+    local base=$1 ref=$2
+    case $ref in
+        http://*|https://*) printf '%s\n' "$ref" ;;
+        //*) printf '%s\n' "${origin%%//*}$ref" ;;
+        /*) printf '%s\n' "$origin$ref" ;;
+        *) printf '%s\n' "${base%/*}/${ref#./}" ;;
+    esac
+}
+
+# names prints every .js reference in a file.
+names() { grep -oE "[A-Za-z0-9_.~/:-]+\.js" "$1" | sort -u || true; }
+
+seen=$dir/.seen
+: > "$seen"
+queue=$dir/.queue
+curl -fsSL --max-time 30 "$page" -o "$dir/index.html"
+case $page in */) base=$page ;; *) base=$page/ ;; esac
+[[ $page =~ ^https?://[^/]+$ ]] || base=${page%/*}/
+names "$dir/index.html" | while read -r ref; do resolve "$base" "$ref"; done > "$queue"
+
+count=0
+while [ -s "$queue" ]; do
+    next=$dir/.next
+    : > "$next"
+    while read -r url; do
+        [[ $url == "$origin"/* ]] || continue
+        grep -qxF "$url" "$seen" && continue
+        echo "$url" >> "$seen"
+        [ "$count" -lt "$max" ] || { echo "Stopped at $max files. Set BUNDLE_MAX_FILES to fetch more." >&2; break 2; }
+        file=$dir/$(printf '%s' "${url#"$origin"/}" | tr '/' '_')
+        if curl -fsSL --max-time 30 "$url" -o "$file" 2>/dev/null; then
+            count=$((count + 1))
+            names "$file" | while read -r ref; do
+                # A chunk is named by its file name alone, next to the file
+                # that names it or at the root.
+                resolve "$url" "$ref"
+                [[ $ref == */* ]] || resolve "$origin/" "$ref"
+            done >> "$next"
+        else
+            rm -f "$file"
+        fi
+    done < "$queue"
+    sort -u "$next" > "$queue"
+done
+rm -f "$seen" "$queue" "$dir/.next"
+echo "Fetched $count script files to $dir."
