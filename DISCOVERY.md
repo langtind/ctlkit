@@ -200,6 +200,8 @@ BankID, ID-porten, Feide and other single sign-ons cannot be done by a tool. The
 
 In the tool, `httpx.BrowserCookies(state, host)` reads the cookies for one host, `session.JWTExpiry` reads when a cookie that is a JWT runs out, and `Session.Extra` holds a part that is neither token, such as a session id. A service that renews in `Set-Cookie` is read with `httpx.CookieCatcher` as the jar of a copy of the client, and renewed with `Manager.RenewFrom`, which gets the whole stored session. Set `Manager.Margin` below the lifetime of the access token.
 
+`Manager` keeps `Extra` through a renewal it runs itself. A `login` that calls the client's renewal directly, to check the cookies before it stores them, gets a session without `Extra` back and has to copy it over before `Save`.
+
 The template's `login` has both ways. Delete the one the service does not have.
 
 If a service truly has no way to renew a login, write that in `reference/README.md` with what you checked, so that the next person does not look again.
