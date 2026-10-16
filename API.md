@@ -122,7 +122,7 @@ s, err := login.Load()                    // without renewing, for status
 login.Clear()
 ```
 
-`RenewFrom func(ctx, stored session.Session)` is `Renew` for a service that needs more than the refresh token, such as a cookie kept in `Extra`. A renewal that returns no refresh token or no `Extra` keeps the stored ones. `session.ErrNotLoggedIn` and `session.ErrExpired` are what `errors.Is` finds. `session.JWTExpiry(token)` reads `exp`. `keystore.Memory` is the store for tests.
+`RenewFrom func(ctx, stored session.Session)` is `Renew` for a service that needs more than the refresh token, such as a cookie kept in `Extra`. A renewal that returns no refresh token or no `Extra` keeps the stored ones. `session.ErrNotLoggedIn` and `session.ErrExpired` are what `errors.Is` finds. `session.JWTExpiry(token)` reads `exp`. `keystore.Keyring` keeps a secret too long for one keychain entry, over 1800 bytes, in parts (`token`, `token.1`, `token.2`). `keystore.Memory` is the store for tests.
 
 ## ctltest: the tests
 

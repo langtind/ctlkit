@@ -11,6 +11,12 @@ go test -race ./... && go vet ./...
 
 Then go through the versions between the old and the new below, and replace the tool's own code with what ctlkit has. Run `refresh` twice against the real service afterwards if the login code was touched.
 
+## v0.6.0
+
+| New | Replaces in a tool |
+| --- | --- |
+| `keystore.Keyring` keeps a long secret in parts | A store of the tool's own that splits a long cookie over several keyring entries, such as `internal/cli/store.go` in artifikctl. A secret that fits is stored as before, so a stored login still reads |
+
 ## v0.5.0
 
 | New | Replaces in a tool |

@@ -283,7 +283,7 @@ If a service truly has no way to renew a login, write that in `reference/README.
 
 **Try every read without the login first (artifikctl, 2026-10).** The user logged in with an SMS code, and then the search, the procurement pages and the attachments all turned out to need no login at all. Only the user's own list needed it. Send each request once with no cookie before you build the login into it.
 
-**The keyring has a size limit (artifikctl, 2026-10).** On macOS go-keyring refuses a value over about 3000 bytes with `data passed to Set was too big`. A login cookie that carries a Cognito access and refresh token is about 4000 bytes, and the session stores it twice. artifikctl splits the value over several keyring entries in `internal/cli/store.go`. It belongs in `keystore`.
+**The keyring has a size limit (artifikctl, 2026-10).** On macOS go-keyring refuses a value over about 3000 bytes with `data passed to Set was too big`. A login cookie that carries a Cognito access and refresh token is about 4000 bytes, and the session stores it twice. From ctlkit v0.6.0 `keystore.Keyring` keeps a long secret in parts, `token`, `token.1`, `token.2`, and a tool needs nothing of its own. To read one by hand, the head entry says `ctlkit-parts:<n>`, and the parts are joined in order.
 
 **json-shape prints the keys of an object, and a key can be data (artifikctl, 2026-10).** An object used as a map, keyed by email or by name, came out with the real emails as its keys. Look at a new answer with `jq 'keys'` on each level first, or replace the map with one entry before `json-shape`.
 
