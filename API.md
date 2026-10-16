@@ -78,7 +78,7 @@ if err := c.Confirm("..."); err != nil { return err }
 made, err := write.Do(ctx)                                 // sends once, then looks it up
 ```
 
-**Small things.** `ctlkit.CheckID(what, value)`, `ctlkit.Quote(text)` for free text from a service, `ctlkit.FileName(name, data)`, `ctlkit.ParseDate("from", value, zone)`, `ctlkit.LocalTime(text, zone)` for a time written without a zone.
+**Small things.** `ctlkit.CheckID(what, value)`, `ctlkit.ContentType(path, data)` for what a saved file holds (a `.docx` or an `.xlsx` by its extension, not as a zip), `ctlkit.Quote(text)` for free text from a service, `ctlkit.FileName(name, data)`, `ctlkit.ParseDate("from", value, zone)`, `ctlkit.LocalTime(text, zone)` for a time written without a zone.
 
 ## httpx: requests
 

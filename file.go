@@ -24,6 +24,30 @@ var extensions = map[string]string{
 	"image/webp": ".webp", "application/zip": ".zip", "text/plain; charset=utf-8": ".txt",
 }
 
+// zipped are the file types that are zip archives inside, which content
+// sniffing alone calls application/zip.
+var zipped = map[string]string{
+	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	".odt":  "application/vnd.oasis.opendocument.text",
+	".ods":  "application/vnd.oasis.opendocument.spreadsheet",
+	".odp":  "application/vnd.oasis.opendocument.presentation",
+	".epub": "application/epub+zip",
+}
+
+// ContentType says what a saved file holds, from its content, and from its
+// extension when the content is a zip archive such as a .docx or an .xlsx.
+func ContentType(path string, data []byte) string {
+	detected := http.DetectContentType(data)
+	if detected == "application/zip" {
+		if t, ok := zipped[strings.ToLower(filepath.Ext(path))]; ok {
+			return t
+		}
+	}
+	return detected
+}
+
 // FileName turns a name a service gave a file into one that is safe to
 // write in the current directory: the last element only, whichever way the
 // slashes lean. A name without an extension gets one from what data holds.
@@ -64,7 +88,7 @@ func (c *Call) Save(data []byte, name string) error {
 	if err := file.Close(); err != nil {
 		return err
 	}
-	saved := SavedFile{Path: path, Bytes: len(data), ContentType: http.DetectContentType(data)}
+	saved := SavedFile{Path: path, Bytes: len(data), ContentType: ContentType(path, data)}
 	return c.Print(saved, func(w io.Writer) {
 		fmt.Fprintf(w, "Saved %s (%d bytes, %s).\n", saved.Path, saved.Bytes, saved.ContentType)
 	})

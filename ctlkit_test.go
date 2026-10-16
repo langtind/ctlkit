@@ -385,3 +385,19 @@ func TestARepeatFlagTakesEachValueWhole(t *testing.T) {
 		t.Errorf("help = %q", stdout)
 	}
 }
+
+func TestContentTypeNamesAZippedDocumentByItsExtension(t *testing.T) {
+	zip := []byte("PK\x03\x04 made up")
+	for path, want := range map[string]string{
+		"Kravspesifikasjon.XLSX": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"avtale.docx":            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"bundle.zip":             "application/zip",
+	} {
+		if got := ctlkit.ContentType(path, zip); got != want {
+			t.Errorf("%s: %s", path, got)
+		}
+	}
+	if got := ctlkit.ContentType("not-really.docx", []byte("%PDF-1.7")); got != "application/pdf" {
+		t.Errorf("a PDF named .docx: %s", got)
+	}
+}
