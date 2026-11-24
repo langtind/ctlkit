@@ -290,3 +290,17 @@ If a service truly has no way to renew a login, write that in `reference/README.
 **An `Enum` is matched in lower case (artifikctl, 2026-10).** ctlkit lowers the input before it compares, so an enum written in upper case, as the service writes it, refuses every value. Write the enum in lower case and convert before sending.
 
 **`Call.Save` is for one file (artifikctl, 2026-10).** It prints one document each time, so a command that saves many files cannot call it in a loop and still print one JSON document. artifikctl writes the files itself with `O_EXCL`, checks every path before it fetches the first file, and prints one list of `ctlkit.SavedFile`. A `SaveAll` in ctlkit would do the same.
+
+**A request from inside the page passes where curl is refused (invoicectl, 2026-11).** admin.openai.com answered 403 to curl with every cookie and header the browser sent, and 200 to the same `fetch` run in the logged-in page. Cloudflare and the app's own checks look at more than cookies. When a plain client is refused, load the storage state into a headless Chrome (chromedp), open any page of the origin, and run the request with `fetch` there. Set the user agent without "HeadlessChrome" first. invoicectl's `internal/browser` does this, and saves the state back after the run, so that a login the page renewed is kept.
+
+**A tenant picker is not a logged-out page (invoicectl, 2026-11).** A fresh browser with the admin portal's cookies was sent to `/auth/tenant-picker`. The API still answered: it needed only the workspace id, which local storage remembered (`admin-portal:csr-last-workspace:v1:<user>`). Open a plain file of the origin, such as `/favicon.ico`, read local storage there, and call the API without the app.
+
+**Some logins cannot move to another browser (invoicectl, 2026-11).** Backblaze's saved state did not log in a new browser, not even playwright's own `state-load` a minute later. The session is bound to the browser that made it. Check this before you build on a stored login: load the state into a second browser at once. For such a service the tool opens a visible window, waits until the user has logged in, and goes on in the same browser.
+
+**An invoice can be a page, not a file (invoicectl, 2026-11).** Notion and Backblaze show invoices as HTML behind the login; print the page with `Page.printToPDF`. Remove a cookie banner from the DOM first, or it is printed. A form that opens its result in a new tab (`target="_blank"`) can be sent to the same tab by setting `form.target = "_self"` before the click.
+
+**A Stripe hosted invoice has a public PDF (invoicectl, 2026-11).** `https://invoice.stripe.com/i/<acct>/<id>` is a script page, so a GET of it gives HTML. `GET https://invoicedata.stripe.com/invoice_pdf_file_url/<acct>/<id>?s=ap` answers `{file_url}`, and that is the PDF. No login.
+
+**A tool for many vendors keeps one login per vendor (invoicectl, 2026-11).** One storage state from one browser session, with the user logged in to every vendor in its own tab, is split by cookie domain and local storage origin into one keyring entry per vendor. Keep only the origins whose local storage holds the login: OpenAI's analytics stored over 2 MB in local storage.
+
+**zsh's `path` is `PATH` (2026-11).** A shell loop with `path=$(...)` emptied `PATH`, and every command after it was "not found". Never name a shell variable `path` in zsh.
