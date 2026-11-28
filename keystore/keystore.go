@@ -58,6 +58,9 @@ type lazy struct {
 }
 
 func (l lazy) open() (Store, error) {
+	if err := checkAccount(l.account); err != nil {
+		return nil, err
+	}
 	config, err := ConfigFrom(getenv, l.service)
 	if err != nil {
 		return nil, err
@@ -240,3 +243,13 @@ func (m *Memory) Get() (string, error) {
 
 func (m *Memory) Set(secret string) error { m.Secret = secret; return nil }
 func (m *Memory) Delete() error           { m.Secret = ""; return nil }
+
+// checkAccount refuses a name that could leave the store's directory or
+// pass for a secret of another profile. Names are a tool's own constants,
+// such as "token", so a bad one is a bug in the tool.
+func checkAccount(account string) error {
+	if account == "" || strings.HasPrefix(account, ".") || strings.ContainsAny(account, "/\\\x00") || strings.Contains(account, "..") {
+		return fmt.Errorf("keystore: %q cannot name a secret: use letters, digits, dots, dashes and underscores", account)
+	}
+	return nil
+}

@@ -204,39 +204,43 @@ func (m *Manager) renew(ctx context.Context, stale string, force bool) (string, 
 }
 
 const (
-	lockWait  = 20 * time.Second
-	lockStale = 60 * time.Second
-	lockPoll  = 50 * time.Millisecond
+	lockWait = 20 * time.Second
+	lockPoll = 50 * time.Millisecond
 )
 
-// lock takes the lock file and returns the function that gives it back. A
-// lock left behind by a run that died is taken over when it is a minute old.
+// lock holds an operating system lock on the lock file and returns the
+// function that gives it back. The lock goes with the open file, so a run
+// that dies, even by SIGKILL, lets it go at once, and no clock decides when
+// a lock is stale. The file itself is never removed: removing it would let
+// a waiting run lock a file that the next run no longer sees.
 func (m *Manager) lock(ctx context.Context) (func(), error) {
 	if m.LockPath == "" {
 		return func() {}, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(m.LockPath), 0o700); err != nil {
+	if err := keystore.PrivateDir(filepath.Dir(m.LockPath)); err != nil {
+		return nil, fmt.Errorf("renew the login: %w", err)
+	}
+	file, err := os.OpenFile(m.LockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
 		return nil, fmt.Errorf("renew the login: %w", err)
 	}
 	deadline := time.Now().Add(lockWait)
 	for {
-		file, err := os.OpenFile(m.LockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-		if err == nil {
+		held, err := tryLock(file)
+		if err != nil {
 			_ = file.Close()
-			return func() { _ = os.Remove(m.LockPath) }, nil
+			return nil, fmt.Errorf("renew the login: lock %s: %w", m.LockPath, err)
 		}
-		if !errors.Is(err, os.ErrExist) {
-			return nil, fmt.Errorf("renew the login: %w", err)
-		}
-		if info, statErr := os.Stat(m.LockPath); statErr == nil && time.Since(info.ModTime()) > lockStale {
-			_ = os.Remove(m.LockPath)
-			continue
+		if held {
+			return func() { _ = unlock(file); _ = file.Close() }, nil
 		}
 		if time.Now().After(deadline) {
+			_ = file.Close()
 			return nil, ctlkit.Errorf(ctlkit.KindUnavailable, "renew the login: another run has held %s for too long", m.LockPath)
 		}
 		select {
 		case <-ctx.Done():
+			_ = file.Close()
 			return nil, ctx.Err()
 		case <-time.After(lockPoll):
 		}

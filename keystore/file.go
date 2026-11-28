@@ -77,10 +77,13 @@ func (f fileStore) open(data []byte) (string, error) {
 // It refuses to replace a file that the key does not open. That file may
 // hold the only good login, written with the right key.
 func (f fileStore) Set(secret string) error {
-	if data, err := os.ReadFile(f.path); err == nil {
+	switch data, err := os.ReadFile(f.path); {
+	case err == nil:
 		if _, err := f.open(data); err != nil {
 			return fmt.Errorf("%w. Nothing was replaced: set the right key, or remove the file to start again", err)
 		}
+	case !errors.Is(err, os.ErrNotExist):
+		return fmt.Errorf("the file store: %w. Nothing was replaced", err)
 	}
 	aead, err := f.aead()
 	if err != nil {
@@ -107,7 +110,7 @@ func (f fileStore) Delete() error {
 
 func writeAtomic(path string, data []byte) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := PrivateDir(dir); err != nil {
 		return err
 	}
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".*")
@@ -133,6 +136,24 @@ func writeAtomic(path string, data []byte) error {
 	if d, err := os.Open(dir); err == nil {
 		_ = d.Sync()
 		_ = d.Close()
+	}
+	return nil
+}
+
+// PrivateDir makes dir with mode 0700 when it is not there. It refuses a
+// directory that others can write to: they could replace a secret, or the
+// lock file, with one of their own. It does not change the mode of a
+// directory it did not make, which may be a volume someone set up on purpose.
+func PrivateDir(dir string) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return err
+	}
+	if info.Mode().Perm()&0o022 != 0 {
+		return fmt.Errorf("%s can be written by others (mode %o): make it private with \"chmod go-w %s\"", dir, info.Mode().Perm(), dir)
 	}
 	return nil
 }

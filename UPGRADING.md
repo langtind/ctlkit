@@ -11,6 +11,14 @@ go test -race ./... && go vet ./...
 
 Then go through the versions between the old and the new below, and replace the tool's own code with what ctlkit has. Run `refresh` twice against the real service afterwards if the login code was touched.
 
+## v0.10.0
+
+| New | Replaces in a tool |
+| --- | --- |
+| The renew lock is an operating system lock (flock, or LockFileEx on Windows) on a file that stays | Nothing. A run that dies lets go of the lock at once, and no clock decides when a lock is stale |
+| `keystore.PrivateDir` | Nothing. The file store and the lock refuse a directory that others can write to |
+| `keystore.Keyring` refuses an account name with `/`, `\`, `..`, a leading `.` or NUL | Nothing, unless a tool names a secret like a path |
+
 ## v0.9.0
 
 | New | Replaces in a tool |

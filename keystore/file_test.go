@@ -228,3 +228,57 @@ func TestDescribeNamesNoSecret(t *testing.T) {
 		t.Errorf("lock dir = %q", LockDir("petctl"))
 	}
 }
+
+func TestAFileThatCannotBeReadIsNeverReplaced(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads every file")
+	}
+	dir := fileEnv(t)
+	store := Keyring("petctl", "token")
+	if err := store.Set("the good login"); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "petctl", "token")
+	before, _ := os.ReadFile(path)
+	if err := os.Chmod(path, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Set("a login over it"); err == nil {
+		t.Error("replaced a file it could not read")
+	}
+	_ = os.Chmod(path, 0o600)
+	if after, _ := os.ReadFile(path); string(after) != string(before) {
+		t.Error("the file changed")
+	}
+}
+
+func TestTheStoreRefusesADirectoryOthersCanWrite(t *testing.T) {
+	dir := fileEnv(t)
+	shared := filepath.Join(dir, "petctl")
+	if err := os.Mkdir(shared, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Chmod(shared, 0o757)
+	if err := Keyring("petctl", "token").Set("x"); err == nil || !strings.Contains(err.Error(), "written by others") {
+		t.Errorf("err = %v", err)
+	}
+	_ = os.Chmod(shared, 0o755)
+	if err := Keyring("petctl", "token").Set("x"); err != nil {
+		t.Errorf("a directory others can only read: %v", err)
+	}
+}
+
+func TestANameThatIsAPathIsRefused(t *testing.T) {
+	fileEnv(t)
+	for _, account := range []string{"", "../../x", "profiles/kari/token", `a\b`, ".hidden", "a..b", "nul\x00"} {
+		if err := Keyring("petctl", account).Set("x"); err == nil {
+			t.Errorf("%q was used as a name", account)
+		}
+		if _, err := Keyring("petctl", account).Get(); err == nil || err == ErrNotFound {
+			t.Errorf("get %q: %v", account, err)
+		}
+	}
+	if err := Keyring("petctl", "api-key_2.v1").Set("x"); err != nil {
+		t.Errorf("a plain name: %v", err)
+	}
+}

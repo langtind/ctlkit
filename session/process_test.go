@@ -40,9 +40,24 @@ func helperRenew() {
 	os.Exit(0)
 }
 
+// helperHold takes the lock, says so, and waits to be killed.
+func helperHold() {
+	m := &Manager{LockPath: os.Getenv("CTLKIT_TEST_LOCK")}
+	if _, err := m.lock(context.Background()); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	_ = os.WriteFile(os.Getenv("CTLKIT_TEST_LOCK")+".held", nil, 0o600)
+	time.Sleep(time.Minute)
+	os.Exit(0)
+}
+
 func TestMain(m *testing.M) {
-	if os.Getenv("CTLKIT_TEST_HELPER") == "renew" {
+	switch os.Getenv("CTLKIT_TEST_HELPER") {
+	case "renew":
 		helperRenew()
+	case "hold":
+		helperHold()
 	}
 	os.Exit(m.Run())
 }
@@ -85,5 +100,56 @@ func TestRunsInSeparateProcessesWithTheFileStoreRenewOnce(t *testing.T) {
 	s, err := m.Load()
 	if err != nil || s.RefreshToken != "r0+" {
 		t.Errorf("stored = %+v, %v", s, err)
+	}
+}
+
+func TestALockHolderThatIsKilledLetsTheNextRunInAtOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lock", "renew.lock")
+	holder := exec.Command(os.Args[0], "-test.run=^$")
+	holder.Env = append(os.Environ(), "CTLKIT_TEST_HELPER=hold", "CTLKIT_TEST_LOCK="+path)
+	if err := holder.Start(); err != nil {
+		t.Fatal(err)
+	}
+	for start := time.Now(); ; time.Sleep(20 * time.Millisecond) {
+		if _, err := os.Stat(path + ".held"); err == nil {
+			break
+		}
+		if time.Since(start) > 10*time.Second {
+			t.Fatal("the holder never took the lock")
+		}
+	}
+
+	m := &Manager{LockPath: path}
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	if _, err := m.lock(ctx); err == nil {
+		t.Fatal("took the lock while another process held it")
+	}
+
+	_ = holder.Process.Kill()
+	_ = holder.Wait()
+	start := time.Now()
+	unlock, err := m.lock(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock()
+	if waited := time.Since(start); waited > time.Second {
+		t.Errorf("waited %v after the holder died", waited)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("the lock file is gone after unlock: %v", err)
+	}
+}
+
+func TestTheLockRefusesADirectoryOthersCanWrite(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shared")
+	if err := os.Mkdir(dir, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Chmod(dir, 0o777)
+	m := &Manager{LockPath: filepath.Join(dir, "renew.lock")}
+	if _, err := m.lock(context.Background()); err == nil || !strings.Contains(err.Error(), "written by others") {
+		t.Errorf("err = %v", err)
 	}
 }

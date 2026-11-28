@@ -311,9 +311,10 @@ func Contract(t *testing.T, build func() *ctlkit.Program, docs ...string) {
 				t.Fatalf("no %s commands found in the code blocks", name)
 			}
 			for _, args := range calls {
-				args, _, _, err := ctlkit.SplitGlobalFlags(args)
+				called := args
+				args, _, _, err := ctlkit.SplitGlobalFlags(called)
 				if err != nil {
-					t.Errorf("%s %s: %v", name, strings.Join(args, " "), err)
+					t.Errorf("%s %s: %v", name, strings.Join(called, " "), err)
 					continue
 				}
 				cmd, rest, err := build().Lookup(args)

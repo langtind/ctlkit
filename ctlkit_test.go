@@ -476,3 +476,15 @@ func TestTheProfileFlagIsInHelpAndSchema(t *testing.T) {
 		t.Errorf("schema globalFlags = %+v", doc.GlobalFlags)
 	}
 }
+
+func TestABadGlobalFlagIsAJSONErrorWithJSON(t *testing.T) {
+	t.Setenv("PETCTL_PROFILE", "")
+	for _, args := range [][]string{{"--json", "version", "--profile"}, {"pets", "--json", "--profile", "Bad Name"}} {
+		code, stdout, stderr := ctltest.Run(sample(), "", args...)
+		var doc ctltest.ErrorDocument
+		ctltest.OneJSON(t, stdout, &doc)
+		if code != 2 || doc.Error.Kind != string(ctlkit.KindUsage) || stderr != "" {
+			t.Errorf("%s: exit %d, %+v, stderr %q", strings.Join(args, " "), code, doc, stderr)
+		}
+	}
+}

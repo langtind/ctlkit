@@ -95,12 +95,13 @@ func (p *Program) Main() int { return p.Run(os.Args[1:]) }
 // Run executes the program with args (without the program name) and returns
 // the exit code.
 func (p *Program) Run(args []string) int {
+	asJSON := wantsJSON(args)
 	args, profile, given, err := SplitGlobalFlags(args)
 	if err == nil {
 		err = p.useProfile(profile, given)
 	}
 	if err != nil {
-		return p.fail(nil, wantsJSON(args), err)
+		return p.fail(nil, asJSON, err)
 	}
 	if given {
 		defer restoreEnv(keystore.ProfileEnv(p.Name))()
@@ -117,7 +118,6 @@ func (p *Program) Run(args []string) int {
 	case "-v", "--version":
 		args = []string{"version"}
 	}
-	asJSON := wantsJSON(args)
 
 	cmd, rest, err := p.Lookup(args)
 	if err != nil {

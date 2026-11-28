@@ -9,7 +9,7 @@ ctlkit is the Go module every `*ctl` tool is built on. It holds the command tabl
 - [API.md](API.md) lists what a tool uses, and [UPGRADING.md](UPGRADING.md) what each version adds. An exported name that is added or changed is written in both in the same commit.
 - Every tool depends on this module. Keep exported names stable. A rename or a changed output is a breaking change for all of them.
 - Nothing about one service goes in here. If only one tool needs it, it belongs in that tool.
-- Dependencies are `go-keyring` and `x/term`. Add another only when it removes real code.
+- Dependencies are `go-keyring`, `x/term` and `x/sys` (for the lock on Windows). Add another only when it removes real code.
 - No long dash characters in code, docs or strings.
 
 ## Layout
