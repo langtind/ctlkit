@@ -137,7 +137,7 @@ var errAsleep = errors.New("the pet is asleep")
 func TestContract(t *testing.T) {
 	dir := t.TempDir()
 	doc := filepath.Join(dir, "SKILL.md")
-	text := "```bash\npetctl pets --kind dog --json\npetctl --profile beate pets --json\nop read op://v/i/p | petctl login --password-stdin\npetctl pet rename <id> Rex --dry-run\n```\n"
+	text := "```bash\npetctl pets --kind dog --json\npetctl --profile ola pets --json\nop read op://v/i/p | petctl login --password-stdin\npetctl pet rename <id> Rex --dry-run\n```\n"
 	if err := os.WriteFile(doc, []byte(text), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -426,10 +426,10 @@ func TestTheProfileComesFromTheFlagOrTheVariable(t *testing.T) {
 		want string
 	}{
 		{"", []string{"whoami"}, "default"},
-		{"", []string{"--profile", "beate", "whoami"}, "beate"},
-		{"", []string{"whoami", "--profile=beate"}, "beate"},
+		{"", []string{"--profile", "ola", "whoami"}, "ola"},
+		{"", []string{"whoami", "--profile=ola"}, "ola"},
 		{"kari", []string{"whoami"}, "kari"},
-		{"kari", []string{"whoami", "--profile", "beate"}, "beate"},
+		{"kari", []string{"whoami", "--profile", "ola"}, "ola"},
 	} {
 		t.Setenv("PETCTL_PROFILE", c.env)
 		code, stdout, stderr := ctltest.Run(withProfileCommand(), "", c.args...)

@@ -129,27 +129,27 @@ func TestADamagedFileIsAnError(t *testing.T) {
 
 func TestProfilesKeepLoginsApart(t *testing.T) {
 	dir := fileEnv(t)
-	if err := Keyring("petctl", "token").Set("arild"); err != nil {
+	if err := Keyring("petctl", "token").Set("kari-login"); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(ProfileEnv("petctl"), "beate")
+	t.Setenv(ProfileEnv("petctl"), "ola")
 	store := Keyring("petctl", "token")
 	if _, err := store.Get(); err != ErrNotFound {
 		t.Fatalf("a new profile sees another login: %v", err)
 	}
-	if err := store.Set("beate"); err != nil {
+	if err := store.Set("ola"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "petctl", "profiles", "beate", "token")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "petctl", "profiles", "ola", "token")); err != nil {
 		t.Errorf("the profile's file: %v", err)
 	}
 
 	t.Setenv(ProfileEnv("petctl"), "")
-	if got, _ := Keyring("petctl", "token").Get(); got != "arild" {
+	if got, _ := Keyring("petctl", "token").Get(); got != "kari-login" {
 		t.Errorf("the default profile: %q", got)
 	}
 	t.Setenv(ProfileEnv("petctl"), "default")
-	if got, _ := Keyring("petctl", "token").Get(); got != "arild" {
+	if got, _ := Keyring("petctl", "token").Get(); got != "kari-login" {
 		t.Errorf(`the profile "default": %q`, got)
 	}
 
@@ -164,7 +164,7 @@ func TestASharedSecretIsTheSameInEveryProfile(t *testing.T) {
 	if err := Shared("petctl", "api-key").Set("key"); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(ProfileEnv("petctl"), "beate")
+	t.Setenv(ProfileEnv("petctl"), "ola")
 	if got, err := Shared("petctl", "api-key").Get(); err != nil || got != "key" {
 		t.Errorf("in another profile: %q, %v", got, err)
 	}
@@ -177,8 +177,8 @@ func TestTheDefaultProfileKeepsTheOldNames(t *testing.T) {
 	if got := Profile(DefaultProfile).entry("token"); got != "token" {
 		t.Errorf("default: %q", got)
 	}
-	if got := Profile("beate").entry("token"); got != "profiles/beate/token" {
-		t.Errorf("beate: %q", got)
+	if got := Profile("ola").entry("token"); got != "profiles/ola/token" {
+		t.Errorf("ola: %q", got)
 	}
 }
 
