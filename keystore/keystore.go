@@ -1,11 +1,16 @@
 // Package keystore keeps one secret between runs: a token, a key or a
-// password. It lives in the operating system's credential store, never in a
-// file.
+// password. By default it lives in the operating system's credential store.
+// A machine without one, such as a server or a container, keeps it in an
+// encrypted file instead: see Config.
+//
+// A program can keep several logins side by side, one per profile. See
+// Profile.
 package keystore
 
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -21,8 +26,13 @@ type Store interface {
 	Delete() error
 }
 
-// Keyring returns a store in the system keyring. service is the program
-// name, and account says what the secret is, such as "token".
+// Keyring returns the store for one secret. service is the program name,
+// and account says what the secret is, such as "token".
+//
+// Where the secret goes is decided when it is read or written, from the
+// environment: the system keyring, or an encrypted file (see Config), under
+// the profile that is in use (see Profile). The default profile keeps the
+// names a store had before profiles, so a stored login still reads.
 //
 // The macOS keychain, through go-keyring, refuses a value of more than
 // about 3000 bytes, and a login cookie can be longer. A long secret is kept
@@ -30,12 +40,56 @@ type Store interface {
 // account.1, account.2 and so on. A secret that fits is kept in one entry,
 // as before.
 func Keyring(service, account string) Store {
+	return lazy{service: service, account: account}
+}
+
+// lazy finds its store at each call, so that a profile chosen on the command
+// line after the store was made is the one used.
+type lazy struct{ service, account string }
+
+func (l lazy) open() (Store, error) {
+	config, err := ConfigFrom(getenv, l.service)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := ProfileFrom(getenv, l.service)
+	if err != nil {
+		return nil, err
+	}
+	entry := profile.entry(l.account)
+	if config.Kind == File {
+		return config.file(l.service, entry), nil
+	}
 	return chunked{open: func(part int) Store {
 		if part == 0 {
-			return systemKeyring{service: service, account: account}
+			return systemKeyring{service: l.service, account: entry}
 		}
-		return systemKeyring{service: service, account: account + "." + strconv.Itoa(part)}
-	}}
+		return systemKeyring{service: l.service, account: entry + "." + strconv.Itoa(part)}
+	}}, nil
+}
+
+func (l lazy) Get() (string, error) {
+	store, err := l.open()
+	if err != nil {
+		return "", err
+	}
+	return store.Get()
+}
+
+func (l lazy) Set(secret string) error {
+	store, err := l.open()
+	if err != nil {
+		return err
+	}
+	return store.Set(secret)
+}
+
+func (l lazy) Delete() error {
+	store, err := l.open()
+	if err != nil {
+		return err
+	}
+	return store.Delete()
 }
 
 type systemKeyring struct{ service, account string }
@@ -45,11 +99,11 @@ func (k systemKeyring) Get() (string, error) {
 	if errors.Is(err, keyring.ErrNotFound) {
 		return "", ErrNotFound
 	}
-	return secret, err
+	return secret, keyringError(err)
 }
 
 func (k systemKeyring) Set(secret string) error {
-	return keyring.Set(k.service, k.account, secret)
+	return keyringError(keyring.Set(k.service, k.account, secret))
 }
 
 func (k systemKeyring) Delete() error {
@@ -57,7 +111,19 @@ func (k systemKeyring) Delete() error {
 	if errors.Is(err, keyring.ErrNotFound) {
 		return nil
 	}
-	return err
+	return keyringError(err)
+}
+
+// keyringError says what to do when there is no keyring to use, as on a
+// server or in a container, where Linux has no Secret Service.
+func keyringError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if runtime.GOOS != "linux" {
+		return fmt.Errorf("the system keyring: %w", err)
+	}
+	return fmt.Errorf("the system keyring: %w (a machine without a desktop session, such as a server or a container, has none: set %s=file and %s)", err, EnvKind, EnvKey)
 }
 
 // partSize keeps each part well under the keychain's limit after go-keyring

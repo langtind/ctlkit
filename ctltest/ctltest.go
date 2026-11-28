@@ -114,6 +114,9 @@ func Contract(t *testing.T, build func() *ctlkit.Program, docs ...string) {
 				}
 			}
 			for _, f := range cmd.Flags {
+				if f.Name == ctlkit.ProfileFlag.Name {
+					t.Errorf("%s --%s: every command takes it already, so it cannot be a command's own flag", cmd.Name, f.Name)
+				}
 				if !flagName.MatchString(f.Name) || f.Help == "" {
 					t.Errorf("%s --%s: needs a lower-case name and help", cmd.Name, f.Name)
 				}
@@ -308,6 +311,11 @@ func Contract(t *testing.T, build func() *ctlkit.Program, docs ...string) {
 				t.Fatalf("no %s commands found in the code blocks", name)
 			}
 			for _, args := range calls {
+				args, _, _, err := ctlkit.SplitGlobalFlags(args)
+				if err != nil {
+					t.Errorf("%s %s: %v", name, strings.Join(args, " "), err)
+					continue
+				}
 				cmd, rest, err := build().Lookup(args)
 				if err != nil {
 					t.Errorf("%s %s: %v", name, strings.Join(args, " "), err)

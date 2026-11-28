@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/langtind/ctlkit/keystore"
 )
 
 func (p *Program) help(ctx context.Context, c *Call) error {
@@ -30,6 +32,7 @@ func (p *Program) printHelp(w io.Writer) {
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "Run \"%s help <command>\" for the flags of one command.\n", p.Name)
+	fmt.Fprintf(w, "Every command takes --%s <name>, or %s, to %s.\n", ProfileFlag.Name, keystore.ProfileEnv(p.Name), ProfileFlag.Help)
 	fmt.Fprintln(w, "Data goes to stdout, notes and errors to stderr. With --json, an error is a JSON document on stdout.")
 	fmt.Fprintf(w, "Exit codes: %s.\n", exitCodeList())
 }

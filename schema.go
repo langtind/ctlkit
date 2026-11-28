@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 	"strings"
+
+	"github.com/langtind/ctlkit/keystore"
 )
 
 // schemaDocument describes the command line for a program. It is built from
@@ -15,7 +17,9 @@ type schemaDocument struct {
 	Summary    string            `json:"summary"`
 	ExitCodes  map[string]string `json:"exitCodes"`
 	ErrorKinds []schemaKind      `json:"errorKinds"`
-	Commands   []schemaCommand   `json:"commands"`
+	// GlobalFlags are taken by every command, before or after its name.
+	GlobalFlags []schemaFlag    `json:"globalFlags"`
+	Commands    []schemaCommand `json:"commands"`
 }
 
 type schemaKind struct {
@@ -61,6 +65,8 @@ func (p *Program) schema(ctx context.Context, c *Call) error {
 		Version:   p.Build.Version,
 		Summary:   p.Summary,
 		ExitCodes: map[string]string{"0": "success"},
+		GlobalFlags: []schemaFlag{{Name: ProfileFlag.Name, Type: string(ProfileFlag.Kind), Default: ProfileFlag.schemaDefault(),
+			Help: ProfileFlag.description() + " Also " + keystore.ProfileEnv(p.Name) + "."}},
 	}
 	for _, k := range kinds {
 		doc.ExitCodes[strconv.Itoa(k.code)] = k.meaning

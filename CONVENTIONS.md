@@ -67,14 +67,15 @@ Every `*ctl` tool follows this contract. The reader of a tool's output is usuall
 ## Secrets
 
 - A secret never comes as an argument. Read it with `Call.Secret`: from stdin with a `--...-stdin` flag, or from a prompt without echo.
-- Store it with `keystore.Keyring`. Never write it to a file, a log or an error message. **(you)**
-- An environment variable may override the keyring, for cron jobs and containers. **(you)**
+- Store it with `keystore.Keyring`. Never write it to a file of your own, a log or an error message. **(you)** On a machine without a keyring, `keystore.Keyring` writes an encrypted file when the user sets `CTLKIT_KEYSTORE_DIR` and `CTLKIT_KEYSTORE_KEY`. A tool needs no code for it.
+- An environment variable may override the store with a token, for a run that should not renew. **(you)**
+- Every command takes `--profile <name>` and `<PROGRAM>_PROFILE`, and keeps one login per profile. `status` shows the profile when it is not `default`. A tool's own command never has a `--profile` flag. **(you)**
 
 ## Login
 
 - A tool stays logged in for as long as the service allows. The caller is an agent, and an agent cannot answer a login prompt.
 - Aim for a refresh token in every tool. The user logs in once, and after that the tool renews the login itself. The password is never stored.
-- Store the login in the system keyring with `session.Manager`, with the refresh token and both expiry times. It renews before the access token runs out and after the service refused one, under a lock so that runs at the same time do not log each other out.
+- Store the login with `session.Manager`, with the refresh token and both expiry times. It renews before the access token runs out and after the service refused one, under a lock so that runs at the same time do not log each other out.
 - Only a clear no from the service ends the login. A failed renewal that is not a refusal leaves it alone.
 - `status` says whether a login is stored and how long it lasts, without calling the service. `refresh` renews it now.
 - A service that logs in with a password takes it on stdin: `login --email <email> --password-stdin`.

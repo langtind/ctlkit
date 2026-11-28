@@ -14,6 +14,7 @@ import (
 
 	"github.com/langtind/ctlkit"
 	"github.com/langtind/ctlkit/ctltest"
+	"github.com/langtind/ctlkit/keystore"
 )
 
 type pet struct {
@@ -136,7 +137,7 @@ var errAsleep = errors.New("the pet is asleep")
 func TestContract(t *testing.T) {
 	dir := t.TempDir()
 	doc := filepath.Join(dir, "SKILL.md")
-	text := "```bash\npetctl pets --kind dog --json\nop read op://v/i/p | petctl login --password-stdin\npetctl pet rename <id> Rex --dry-run\n```\n"
+	text := "```bash\npetctl pets --kind dog --json\npetctl --profile beate pets --json\nop read op://v/i/p | petctl login --password-stdin\npetctl pet rename <id> Rex --dry-run\n```\n"
 	if err := os.WriteFile(doc, []byte(text), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -399,5 +400,79 @@ func TestContentTypeNamesAZippedDocumentByItsExtension(t *testing.T) {
 	}
 	if got := ctlkit.ContentType("not-really.docx", []byte("%PDF-1.7")); got != "application/pdf" {
 		t.Errorf("a PDF named .docx: %s", got)
+	}
+}
+
+// withProfileCommand is the sample with a command that prints the profile
+// in use, as status does.
+func withProfileCommand() *ctlkit.Program {
+	p := sample()
+	p.Commands = append(p.Commands, ctlkit.Command{
+		Name:    "whoami",
+		Summary: "Print the profile in use",
+		Run: func(ctx context.Context, c *ctlkit.Call) error {
+			fmt.Fprintln(c.Stdout, keystore.CurrentProfile("petctl"))
+			return nil
+		},
+	})
+	return p
+}
+
+func TestTheProfileComesFromTheFlagOrTheVariable(t *testing.T) {
+	t.Setenv("PETCTL_PROFILE", "")
+	for _, c := range []struct {
+		env  string
+		args []string
+		want string
+	}{
+		{"", []string{"whoami"}, "default"},
+		{"", []string{"--profile", "beate", "whoami"}, "beate"},
+		{"", []string{"whoami", "--profile=beate"}, "beate"},
+		{"kari", []string{"whoami"}, "kari"},
+		{"kari", []string{"whoami", "--profile", "beate"}, "beate"},
+	} {
+		t.Setenv("PETCTL_PROFILE", c.env)
+		code, stdout, stderr := ctltest.Run(withProfileCommand(), "", c.args...)
+		if code != 0 || strings.TrimSpace(stdout) != c.want {
+			t.Errorf("%s with PETCTL_PROFILE=%q: exit %d, %q %q", strings.Join(c.args, " "), c.env, code, stdout, stderr)
+		}
+		if got := os.Getenv("PETCTL_PROFILE"); got != c.env {
+			t.Errorf("%s left PETCTL_PROFILE=%q behind", strings.Join(c.args, " "), got)
+		}
+	}
+}
+
+func TestABadProfileIsAWrongCall(t *testing.T) {
+	t.Setenv("PETCTL_PROFILE", "")
+	for _, args := range [][]string{
+		{"whoami", "--profile", "../etc"},
+		{"whoami", "--profile"},
+		{"whoami", "--profile", "--json"},
+	} {
+		if code, _, stderr := ctltest.Run(withProfileCommand(), "", args...); code != 2 {
+			t.Errorf("%s: exit %d, %q", strings.Join(args, " "), code, stderr)
+		}
+	}
+	t.Setenv("PETCTL_PROFILE", "Not Ok")
+	if code, _, _ := ctltest.Run(withProfileCommand(), "", "whoami"); code != 2 {
+		t.Errorf("a bad PETCTL_PROFILE: exit %d", code)
+	}
+}
+
+func TestTheProfileFlagIsInHelpAndSchema(t *testing.T) {
+	_, stdout, _ := ctltest.Run(sample(), "", "help")
+	if !strings.Contains(stdout, "--profile <name>") || !strings.Contains(stdout, "PETCTL_PROFILE") {
+		t.Errorf("help does not name the profile:\n%s", stdout)
+	}
+	_, stdout, _ = ctltest.Run(sample(), "", "schema")
+	var doc struct {
+		GlobalFlags []struct {
+			Name, Type string
+			Default    any
+		} `json:"globalFlags"`
+	}
+	ctltest.OneJSON(t, stdout, &doc)
+	if len(doc.GlobalFlags) != 1 || doc.GlobalFlags[0].Name != "profile" || doc.GlobalFlags[0].Default != "default" {
+		t.Errorf("schema globalFlags = %+v", doc.GlobalFlags)
 	}
 }

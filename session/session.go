@@ -68,8 +68,14 @@ type Manager struct {
 	Now func() time.Time
 }
 
-// LockFile returns the lock file for a program, in the user's cache directory.
+// LockFile returns the lock file for a program. With the file store it is in
+// the store's directory, so every run that shares the files shares the lock,
+// whichever user or home directory it runs with. Otherwise it is in the
+// user's cache directory. All profiles of a program share it.
 func LockFile(program string) string {
+	if dir := keystore.LockDir(program); dir != "" {
+		return filepath.Join(dir, "renew.lock")
+	}
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		dir = os.TempDir()
@@ -111,7 +117,7 @@ func (m *Manager) Load() (Session, error) {
 	case errors.Is(err, keystore.ErrNotFound) || (err == nil && raw == ""):
 		return Session{}, ErrNotLoggedIn
 	case err != nil:
-		return Session{}, fmt.Errorf("read the login from the keyring: %w", err)
+		return Session{}, fmt.Errorf("read the stored login: %w", err)
 	}
 	var s Session
 	// A value that is not a session is a bare token, as an older version
@@ -192,7 +198,7 @@ func (m *Manager) renew(ctx context.Context, stale string, force bool) (string, 
 		renewed.Extra = s.Extra
 	}
 	if err := m.Save(renewed); err != nil {
-		return "", fmt.Errorf("store the renewed login in the keyring: %w", err)
+		return "", fmt.Errorf("store the renewed login: %w", err)
 	}
 	return renewed.AccessToken, nil
 }

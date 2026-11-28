@@ -11,6 +11,17 @@ go test -race ./... && go vet ./...
 
 Then go through the versions between the old and the new below, and replace the tool's own code with what ctlkit has. Run `refresh` twice against the real service afterwards if the login code was touched.
 
+## v0.8.0
+
+| New | Replaces in a tool |
+| --- | --- |
+| The file store: `CTLKIT_KEYSTORE=file` or `CTLKIT_KEYSTORE_DIR`, with `CTLKIT_KEYSTORE_KEY` | Nothing. A tool that stores with `keystore.Keyring` runs on a server or in a container without a keyring. See "On a server or in a container" in the README |
+| `--profile <name>` on every command, and `<PROGRAM>_PROFILE` | Nothing. A tool keeps one login per profile. The default profile keeps the old names, so a stored login still reads |
+| `keystore.Describe`, `keystore.CurrentProfile` | "the system keyring" written in `login` and `status`. Say where the login is with `Describe`, and show the profile in `status` |
+| `session.LockFile` in the store's directory with the file store | Nothing |
+
+A command of the tool's own may not be called `--profile`. The contract test says so.
+
 ## v0.7.0
 
 | New | Replaces in a tool |

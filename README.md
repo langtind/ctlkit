@@ -39,7 +39,7 @@ That gives `petctl pets`, `petctl pets --json --fields id,name`, `petctl pets --
 | --- | --- |
 | `ctlkit` | `Program`, the command table, `Call`, error kinds, `CheckID`, `Quote` |
 | `ctlkit/httpx` | `Do`, which turns an HTTP status into an error kind and never retries. `BrowserCookies` and `CookieCatcher` for a login that lives in cookies. `Form` for a multipart body with JSON and files |
-| `ctlkit/keystore` | One secret in the system keyring, and `Memory` for tests |
+| `ctlkit/keystore` | One secret in the system keyring or an encrypted file, per profile, and `Memory` for tests |
 | `ctlkit/session` | A login that renews itself: access token, refresh token, `Extra` for what else it has, and renewal under a lock |
 | `ctlkit/ctltest` | `Contract`, which holds a tool to the conventions, `NewFake`, a service that does not exist, and the checks every tool runs |
 
@@ -52,6 +52,35 @@ That gives `petctl pets`, `petctl pets --json --fields id,name`, `petctl pets --
 - **`Call.Save(data, name)`.** Writes a fetched file under its own name or at `--output`, never outside the current directory by a name from the service, and never over a file that exists.
 - **`Command.Long`.** Help that does not fit in a summary, shown by `help <command>` and in the schema.
 - **`Arg{ID: true}`.** Refuses an id that holds a query string, an encoded character or a path.
+
+## On a server or in a container
+
+The system keyring needs a desktop session. A Linux server or a container has none (there is no Secret Service on D-Bus), so `keystore.Keyring` fails there. Use the file store instead. Every tool built on ctlkit reads the same variables:
+
+```bash
+export CTLKIT_KEYSTORE_DIR=/data/keystore              # one directory for all the tools: /data/keystore/<program>/
+export CTLKIT_KEYSTORE_KEY="$(openssl rand -base64 32)"  # make it once and keep it with the machine's other secrets
+```
+
+`CTLKIT_KEYSTORE=file` chooses the file store under `$XDG_STATE_HOME/<program>` (or `~/.local/state/<program>`) instead of a directory of its own. `CTLKIT_KEYSTORE=keyring` is the default.
+
+- Each secret is one file, readable by its owner only, sealed with AES-256-GCM. The program and the name of the secret are sealed in with it, so a file copied to another name or tool does not open.
+- A file is replaced in one step, a new file renamed over the old one, so a run that dies while it writes leaves the old login whole. A service that rotates refresh tokens must never lose the new one.
+- The renew lock is in the same directory, so runs that share the files also share the lock.
+- With the wrong key nothing opens, and nothing is overwritten. Set the right key, or log out.
+- There is no way to store in the clear. The key protects a copy of the directory, such as a backup. It does not protect against someone who can read the key, so keep it out of the directory and out of the image.
+
+In a container, log in once with a terminal attached, and let cron do the rest:
+
+```bash
+docker exec -it <container> <program> login
+```
+
+Never copy a login from another machine. A service that rotates its refresh tokens ends the login on both when the copy renews.
+
+## Profiles
+
+`--profile <name>`, before or after the command, or `<PROGRAM>_PROFILE=<name>`, keeps a login of its own under that name: two people's accounts on one machine. Names are lower-case letters, digits and dashes. The default profile is `default` and keeps the names a login had before profiles. All profiles of a program share one renew lock.
 
 ## Test a tool
 

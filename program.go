@@ -22,6 +22,8 @@ import (
 	"syscall"
 
 	"golang.org/x/term"
+
+	"github.com/langtind/ctlkit/keystore"
 )
 
 // Build holds the version information injected at build time.
@@ -93,6 +95,18 @@ func (p *Program) Main() int { return p.Run(os.Args[1:]) }
 // Run executes the program with args (without the program name) and returns
 // the exit code.
 func (p *Program) Run(args []string) int {
+	args, profile, given, err := SplitGlobalFlags(args)
+	if err == nil {
+		err = p.useProfile(profile, given)
+	}
+	if err != nil {
+		return p.fail(nil, wantsJSON(args), err)
+	}
+	if given {
+		defer restoreEnv(keystore.ProfileEnv(p.Name))()
+		_ = os.Setenv(keystore.ProfileEnv(p.Name), profile)
+	}
+
 	if len(args) == 0 {
 		p.printHelp(p.Stderr)
 		return ExitCode(KindUsage)
@@ -299,4 +313,59 @@ func (p *Program) readLine() (string, error) {
 		return "", err
 	}
 	return strings.TrimRight(line, "\r\n"), nil
+}
+
+// ProfileFlag is the one flag every program takes, before or after the
+// command. It chooses the profile the login is kept under, as the
+// <PROGRAM>_PROFILE variable does. See keystore.Profile.
+var ProfileFlag = Flag{Name: "profile", Kind: String, Value: "name", Default: keystore.DefaultProfile,
+	Help: "keep the login under this name, apart from the others, such as one per person"}
+
+// SplitGlobalFlags takes --profile out of the arguments, wherever it is
+// before a "--". given is false when it was not there.
+func SplitGlobalFlags(args []string) (rest []string, profile string, given bool, err error) {
+	flag := "--" + ProfileFlag.Name
+	rest = make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--":
+			return append(rest, args[i:]...), profile, given, nil
+		case arg == flag:
+			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "-") {
+				return nil, "", false, Usagef("%s needs a name", flag)
+			}
+			i++
+			profile, given = args[i], true
+		case strings.HasPrefix(arg, flag+"="):
+			profile, given = strings.TrimPrefix(arg, flag+"="), true
+		default:
+			rest = append(rest, arg)
+		}
+	}
+	return rest, profile, given, nil
+}
+
+// useProfile checks the profile from the flag, or else from the variable.
+func (p *Program) useProfile(profile string, given bool) error {
+	if !given {
+		profile = os.Getenv(keystore.ProfileEnv(p.Name))
+	}
+	if _, err := keystore.ParseProfile(profile); err != nil {
+		return Usagef("%w", err)
+	}
+	return nil
+}
+
+// restoreEnv returns the function that puts a variable back as it is now.
+// A test runs many programs in one process.
+func restoreEnv(name string) func() {
+	old, had := os.LookupEnv(name)
+	return func() {
+		if had {
+			_ = os.Setenv(name, old)
+		} else {
+			_ = os.Unsetenv(name)
+		}
+	}
 }
