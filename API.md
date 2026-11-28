@@ -122,7 +122,7 @@ s, err := login.Load()                    // without renewing, for status
 login.Clear()
 ```
 
-`keystore.Keyring` decides at each call where the secret goes: the system keyring, or an encrypted file when `CTLKIT_KEYSTORE=file` or `CTLKIT_KEYSTORE_DIR` is set, under the profile from `--profile` or `<PROGRAM>_PROFILE`. A tool needs no code for either. `keystore.Describe(program)` says where the login is kept and `keystore.CurrentProfile(program)` which profile is in use, for `login` and `status`. `session.LockFile` puts the lock in the store's directory when it is a file store.
+`keystore.Keyring` decides at each call where the secret goes: the system keyring, or an encrypted file when `CTLKIT_KEYSTORE=file` or `CTLKIT_KEYSTORE_DIR` is set, under the profile from `--profile` or `<PROGRAM>_PROFILE`. A tool needs no code for either. `keystore.Shared(program, account)` is the same store for every profile, for a key that all users share. `keystore.Describe(program)` says where the login is kept and `keystore.CurrentProfile(program)` which profile is in use, for `login` and `status`. `session.LockFile` puts the lock in the store's directory when it is a file store.
 
 `RenewFrom func(ctx, stored session.Session)` is `Renew` for a service that needs more than the refresh token, such as a cookie kept in `Extra`. A renewal that returns no refresh token or no `Extra` keeps the stored ones. `session.ErrNotLoggedIn` and `session.ErrExpired` are what `errors.Is` finds. `session.JWTExpiry(token)` reads `exp`. `keystore.Keyring` keeps a secret too long for one keychain entry, over 1800 bytes, in parts (`token`, `token.1`, `token.2`). `keystore.Memory` is the store for tests.
 

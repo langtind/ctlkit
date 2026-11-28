@@ -159,6 +159,20 @@ func TestProfilesKeepLoginsApart(t *testing.T) {
 	}
 }
 
+func TestASharedSecretIsTheSameInEveryProfile(t *testing.T) {
+	fileEnv(t)
+	if err := Shared("petctl", "api-key").Set("key"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(ProfileEnv("petctl"), "beate")
+	if got, err := Shared("petctl", "api-key").Get(); err != nil || got != "key" {
+		t.Errorf("in another profile: %q, %v", got, err)
+	}
+	if _, err := Keyring("petctl", "api-key").Get(); err != ErrNotFound {
+		t.Errorf("a profile's own store sees the shared secret: %v", err)
+	}
+}
+
 func TestTheDefaultProfileKeepsTheOldNames(t *testing.T) {
 	if got := Profile(DefaultProfile).entry("token"); got != "token" {
 		t.Errorf("default: %q", got)

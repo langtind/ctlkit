@@ -43,18 +43,30 @@ func Keyring(service, account string) Store {
 	return lazy{service: service, account: account}
 }
 
+// Shared is Keyring for a secret that every profile uses, such as a key
+// that is the same for all users of a service. It is kept under the
+// default profile's name.
+func Shared(service, account string) Store {
+	return lazy{service: service, account: account, shared: true}
+}
+
 // lazy finds its store at each call, so that a profile chosen on the command
 // line after the store was made is the one used.
-type lazy struct{ service, account string }
+type lazy struct {
+	service, account string
+	shared           bool
+}
 
 func (l lazy) open() (Store, error) {
 	config, err := ConfigFrom(getenv, l.service)
 	if err != nil {
 		return nil, err
 	}
-	profile, err := ProfileFrom(getenv, l.service)
-	if err != nil {
-		return nil, err
+	profile := Profile(DefaultProfile)
+	if !l.shared {
+		if profile, err = ProfileFrom(getenv, l.service); err != nil {
+			return nil, err
+		}
 	}
 	entry := profile.entry(l.account)
 	if config.Kind == File {
