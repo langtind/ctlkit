@@ -79,7 +79,7 @@ func (f fileStore) open(data []byte) (string, error) {
 func (f fileStore) Set(secret string) error {
 	if data, err := os.ReadFile(f.path); err == nil {
 		if _, err := f.open(data); err != nil {
-			return fmt.Errorf("%w. Nothing was replaced: set the right key, or log out to remove it", err)
+			return fmt.Errorf("%w. Nothing was replaced: set the right key, or remove the file to start again", err)
 		}
 	}
 	aead, err := f.aead()

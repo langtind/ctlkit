@@ -67,7 +67,7 @@ export CTLKIT_KEYSTORE_KEY="$(openssl rand -base64 32)"  # make it once and keep
 - Each secret is one file, readable by its owner only, sealed with AES-256-GCM. The program and the name of the secret are sealed in with it, so a file copied to another name or tool does not open.
 - A file is replaced in one step, a new file renamed over the old one, so a run that dies while it writes leaves the old login whole. A service that rotates refresh tokens must never lose the new one.
 - The renew lock is in the same directory, so runs that share the files also share the lock.
-- With the wrong key nothing opens, and nothing is overwritten. Set the right key, or log out.
+- With the wrong key nothing opens, and nothing is overwritten. Set the right key, or remove the file and log in again.
 - There is no way to store in the clear. The key protects a copy of the directory, such as a backup. It does not protect against someone who can read the key, so keep it out of the directory and out of the image.
 
 In a container, log in once with a terminal attached, and let cron do the rest:
